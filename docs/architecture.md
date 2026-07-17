@@ -22,12 +22,14 @@ The `lint` command validates the complete set, canonical ordinal, unique declara
 - Identity, policy, and human decisions issue grants.
 - A model is never an issuer.
 - Delegation can only reduce scope, resources, validity, and budget.
+- Every grant lineage is acyclic and reaches a human or identity-provider trust root; service policy grants must be attenuated children.
 - High-risk commits bind the actor, resource, capability, prepared action digest, authority grant, and approval receipt.
 - Retrieved or user-supplied untrusted text remains data even when it influences a proposal.
 
 ### Evidence & Operations
 
 - Operational facts are hash-linked as receipts.
+- Decisions, attestations, criterion results, boundary observations, and receipts form one backward-only causal DAG; future and cyclic evidence is rejected.
 - Runtime payloads are externalized as artifacts and bound by attestations.
 - Decisions expose concise summaries, selected and rejected options, and evidence references; private model reasoning is not a contract.
 - Distributed mode requires node attribution on every receipt.
@@ -35,9 +37,11 @@ The `lint` command validates the complete set, canonical ordinal, unique declara
 ### Lifecycle & Conformance
 
 - Profiles select composable rules from YAML configuration.
+- Built-in rules are a non-removable baseline; custom profile configuration is additive and its digest is recorded in every report.
 - Side effects use prepare, commit, verify, and—at higher risk—compensate.
 - Idempotency is enforced at the capability boundary.
 - The observed budget record is checked against the execution envelope rather than inferred from configuration alone.
+- Requested outcomes, per-criterion results, run status, and conformance status remain distinct.
 
 ## Runtime sequence
 
@@ -82,4 +86,4 @@ Untrusted context is deliberately excluded from authority, but this does not mak
 
 ## Deployment profiles
 
-The same contracts support a single process, a modular monolith, or distributed services. Deployment changes transport and failure modes, not ownership. A local-private profile can use local inference and state; an enterprise profile can use managed compute behind the same `Model & Compute` boundary.
+The same contracts support a single process, a modular monolith, or distributed services. Deployment changes transport and failure modes, not ownership. A `local-private` assessment requires a sealed runtime observation linked from the receipt chain; changing manifest labels alone cannot satisfy it. An enterprise profile can use managed compute behind the same `Model & Compute` boundary.

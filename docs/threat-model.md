@@ -19,10 +19,13 @@ Model output, retrieved content, external messages, tool descriptions, and impor
 | --- | --- | --- |
 | Prompt text claims authorization | Grant issuer enum excludes models; authority checks occur outside model compute. | A compromised external issuer can still issue a bad grant. |
 | Delegated agent expands access | Exact subset checks for scope, resources, time, and every budget dimension. | Resource matching is exact in the alpha runtime; production pattern engines need their own verified semantics. |
+| Service policies create a circular authority chain | Grant lineages must be acyclic and terminate at a human or identity-provider root. | Compromise of a legitimate root remains outside hash-only verification. |
 | Approval is reused for another action | Approval binds the prepared action digest, authority grant, capability, and expiry. | A compromised preparation implementation can misrepresent the action. |
-| Duplicate or retried write | Capability-owned idempotency key and action-digest collision check. | Idempotency storage must be durable in a real adapter. |
+| Duplicate or retried write | Each capability run enforces a one-to-one action-digest/idempotency-key relation and rejects a second commit for either binding. | Idempotency storage must be durable in a real adapter. |
 | Write reports success without effect | Attested verification or compensation must follow a commit. | The verifier and producer may share a failure domain unless deployed independently. |
 | Receipt history is edited | Sequence, previous digest, record digest, run id, and backward-only evidence references are replayed. | Hash linking alone does not authenticate the author or prevent wholesale replacement. |
+| Future or cyclic evidence manufactures lineage | One timestamped dependency graph covers decisions, criteria, boundary evidence, attestations, approvals, authority, and events. | Trusted time and non-repudiation still require external infrastructure. |
+| A local profile is satisfied by relabeling configuration | `local-private` requires sealed runtime hosting, data-boundary, endpoint, and observed-egress evidence linked from a receipt. | The observer must be independently trusted and able to see relevant egress. |
 | Semantic cache crosses policy or tenant | Composite fingerprint binds policy, capabilities, context, outcome, tenant, and privacy. | Incorrect upstream canonicalization can still create a false semantic match. |
 | Sensitive reasoning leaks | Decision evidence is restricted to summaries and evidence references. | Applications must still redact summaries and artifact payloads. |
 | Oversized or alias-heavy input exhausts the CLI | File size and YAML alias limits. | Deep but valid JSON may still require process-level resource limits for hostile multi-tenant use. |
