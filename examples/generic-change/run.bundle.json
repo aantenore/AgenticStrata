@@ -88,7 +88,7 @@
         "managed"
       ]
     },
-    "capabilitySetDigest": "0598363469f966ed19ed63739ee0a13540b2450f13dbf2ea5e1bb477350f9713",
+    "capabilitySetDigest": "7cefb92c8cec28135b31f43c56143378b47dc5f0bd747cd376f84842ea2c124c",
     "conformanceProfiles": [
       "core",
       "enterprise"
@@ -135,13 +135,13 @@
         ],
         "outcomeDigest": "ba7883f15ebf0be1364e22cd0a66ba8c4689bc34fbc75d6e3f85404126873bf1",
         "policyBundleDigest": "db387ff210c86e1242c9df93bf97e1c347ec6a5662e55f0c3d9797a6080bf6ab",
-        "capabilitySetDigest": "0598363469f966ed19ed63739ee0a13540b2450f13dbf2ea5e1bb477350f9713",
+        "capabilitySetDigest": "7cefb92c8cec28135b31f43c56143378b47dc5f0bd747cd376f84842ea2c124c",
         "tenantPartitionDigest": "25df65715893abae2a9be1be21813a8e905f032e90c67d68839916f8f40d8455",
         "privacyPartition": "tenant",
-        "digest": "8e10ad6f2419f5638134786a46fbd21a9e4d10cc2f0665a600c370aa6c7b46a1"
+        "digest": "be0ce03a191c4eb979d58ac893512778d895a5110531355fe33458d41425c053"
       },
-      "cacheKey": "e6734c300824900b68321161ed2183afc720c99f18e98e48cb3a1a065dac443d",
-      "digest": "c1eb7b6afb27b5e1be994902e184f3b6e135b0a9428e3ae3bf78b5392cb90204"
+      "cacheKey": "3706ad612e3db23d45659290568198cac313795da731071adbbf7a0091471d61",
+      "digest": "6b6cc337bd0a55acb81a4b888af957893f7a132122197b6061e6bd8472e85adb"
     }
   },
   "outcome": {
@@ -198,6 +198,39 @@
     "observedAt": "2026-07-17T12:00:00.000Z",
     "digest": "daf69db31e4a92d87b39e9e3adf091b6413d312b1815551c2db910546762d07b"
   },
+  "runtimeBoundaries": [],
+  "criterionResults": [
+    {
+      "contractType": "CriterionResult",
+      "apiVersion": "agenticstrata.dev/v1",
+      "resultId": "result-criterion-value",
+      "runId": "run-change-demo-001",
+      "outcomeId": "outcome-change-001",
+      "criterionId": "criterion-value",
+      "status": "passed",
+      "summary": "Independent read-back matched the approved target value.",
+      "evidenceRefs": [
+        "urn:agentic-strata:artifact:attestation-result-001"
+      ],
+      "observedAt": "2026-07-17T12:00:00.000Z",
+      "digest": "aa6b492b26760e778d1321b23c48b5b213fd3c1b0277023f1fa9f6175f3ff84b"
+    },
+    {
+      "contractType": "CriterionResult",
+      "apiVersion": "agenticstrata.dev/v1",
+      "resultId": "result-criterion-once",
+      "runId": "run-change-demo-001",
+      "outcomeId": "outcome-change-001",
+      "criterionId": "criterion-once",
+      "status": "passed",
+      "summary": "The duplicate attempt returned the original receipt without a second commit.",
+      "evidenceRefs": [
+        "urn:agentic-strata:artifact:attestation-result-001"
+      ],
+      "observedAt": "2026-07-17T12:00:00.000Z",
+      "digest": "f601f0e5a9f36cfbd22a0b58af9693fd535153332ed348e6a39e6f6039a0476b"
+    }
+  ],
   "authorityGrants": [
     {
       "contractType": "AuthorityGrant",
@@ -289,8 +322,21 @@
       "authorityScopes": [
         "change:commit"
       ],
+      "schemaDialect": "https://json-schema.org/draft/2020-12/schema",
       "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
+        "properties": {
+          "resource": {
+            "type": "string",
+            "minLength": 1
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {}
+        },
         "required": [
           "resource",
           "key",
@@ -299,7 +345,18 @@
         "additionalProperties": false
       },
       "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
+        "properties": {
+          "actionDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "committedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
         "required": [
           "actionDigest",
           "committedAt"
@@ -311,7 +368,7 @@
         "verificationRequired": true,
         "compensationRequired": true
       },
-      "digest": "42b0df6c4be1b153e825f0ed1051642c87177986c6ffbd7d2714f54683fca98d"
+      "digest": "1bf43aa0085fcf23d728adf8b966c57136aec66812c43c5669d600dda6c4826f"
     }
   ],
   "decisions": [
@@ -378,12 +435,14 @@
       "attestationId": "attestation-prepared-001",
       "artifactRef": "artifact://change/prepared-001",
       "artifactDigest": "fecac26cfb44052046628f858679467caed3099c1664a56a1c73642cc3c5c2a1",
+      "capabilityId": "generic-change",
+      "subjectDigest": "a3a0e1199d50d0b501f13ab1a39cd765d9123420aefab497920b237c7b50c63c",
       "producer": "capability-generic-change",
       "createdAt": "2026-07-17T12:00:00.000Z",
       "provenanceRefs": [
         "urn:agentic-strata:authority:grant-change-001"
       ],
-      "digest": "f089420e710dc9cf2f3fd2914b8f74a6b2646909db8f0b53a2770bcc6cf36439"
+      "digest": "69aabbe89a48e1b3133919c0ed0766d5adfd09f642680c8ba47cfeb9f5bed7fd"
     },
     {
       "contractType": "ArtifactAttestation",
@@ -391,13 +450,15 @@
       "attestationId": "attestation-result-001",
       "artifactRef": "artifact://change/result-001",
       "artifactDigest": "6f6cca710c22500bc38f69ab97e51cc2a42e47cb7668ca3060ccbfec25d6bd49",
+      "capabilityId": "generic-change",
+      "subjectDigest": "a3a0e1199d50d0b501f13ab1a39cd765d9123420aefab497920b237c7b50c63c",
       "producer": "capability-generic-change",
       "createdAt": "2026-07-17T12:00:00.000Z",
       "provenanceRefs": [
         "urn:agentic-strata:authority:grant-change-001",
         "urn:agentic-strata:approval:approval-change-001"
       ],
-      "digest": "69b1a322fa97f95127b7c526b09bd1874917b3501bbefa36c057cff6df11ba2e"
+      "digest": "a1803d1681b47ba81281b7abddbd1e7423e0740db21392b4d64a1d619604966d"
     }
   ],
   "traceEvents": [
@@ -618,10 +679,12 @@
       "stratum": "interaction",
       "summary": "Outcome criteria passed with verified runtime evidence.",
       "evidenceRefs": [
-        "urn:agentic-strata:artifact:attestation-result-001"
+        "urn:agentic-strata:artifact:attestation-result-001",
+        "urn:agentic-strata:criterion:result-criterion-value",
+        "urn:agentic-strata:criterion:result-criterion-once"
       ],
       "previousDigest": "146a5fea278a8926e6b917623793de5521a9307dfdc97d1642dc7381e2b733fc",
-      "digest": "0fc6295a9709ebe11cfbdb67cb032b62782580c9d56dd65ab8f3c4315a0298dc"
+      "digest": "f48f6bbaa5573c1cf017581e938b5c100bd6a6af79d44e880d9f3f7cd13034f6"
     }
   ]
 }

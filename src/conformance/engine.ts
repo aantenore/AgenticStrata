@@ -1,5 +1,6 @@
 import { API_VERSION } from "../contracts/types.js";
 import type {
+  AuthorityGrant,
   CapabilityContract,
   ConformanceCheck,
   ConformanceProfile,
@@ -8,7 +9,7 @@ import type {
   TraceEvent,
   ValidationIssue
 } from "../contracts/types.js";
-import { validateAs } from "../contracts/registry.js";
+import { validateAs, validateCapabilitySchemas } from "../contracts/registry.js";
 import {
   budgetIsAttenuated,
   validateChildGrant,
@@ -18,6 +19,7 @@ import { digestValue, verifySeal } from "../core/canonical.js";
 import { validateCompositeFingerprint } from "../core/fingerprint.js";
 import { evidenceIndex, verifyTraceChain } from "../core/receipts.js";
 import {
+  extendProfileConfiguration,
   loadProfileConfiguration,
   resolveProfileRules,
   type ProfileConfiguration
@@ -29,7 +31,7 @@ export interface ConformanceOptions {
   generatedAt?: string;
 }
 
-type Rule = (bundle: RunBundle) => ConformanceCheck;
+type Rule = (bundle: RunBundle, profile: ConformanceProfile) => ConformanceCheck;
 
 function check(
   id: string,
@@ -54,11 +56,85 @@ function capabilityFor(bundle: RunBundle, event: TraceEvent): CapabilityContract
     : undefined;
 }
 
+const digestPattern = /^[a-f0-9]{64}$/u;
+
+function isDigest(value: unknown): value is string {
+  return typeof value === "string" && digestPattern.test(value);
+}
+
+function authorityForCommit(
+  bundle: RunBundle,
+  capability: CapabilityContract,
+  event: TraceEvent
+): AuthorityGrant | undefined {
+  const grantId = event.attributes.authorityGrantId;
+  const actorId = event.attributes.actorId;
+  const resource = event.attributes.resource;
+  const occurredAt = Date.parse(event.occurredAt);
+  if (
+    typeof grantId !== "string" ||
+    typeof actorId !== "string" ||
+    typeof resource !== "string" ||
+    !Number.isFinite(occurredAt)
+  ) {
+    return undefined;
+  }
+  const grant = bundle.authorityGrants.find((candidate) => candidate.grantId === grantId);
+  if (grant === undefined) {
+    return undefined;
+  }
+  const validFrom = Date.parse(grant.validFrom);
+  const expiresAt = Date.parse(grant.expiresAt);
+  const valid =
+    actorId === grant.subject &&
+    grant.resourcePatterns.includes(resource) &&
+    capability.authorityScopes.every((scope) => grant.scopes.includes(scope)) &&
+    Number.isFinite(validFrom) &&
+    Number.isFinite(expiresAt) &&
+    occurredAt >= validFrom &&
+    occurredAt <= expiresAt &&
+    event.evidenceRefs.includes(`urn:agentic-strata:authority:${grantId}`);
+  return valid ? grant : undefined;
+}
+
+function evidenceBindsAction(
+  bundle: RunBundle,
+  reference: string,
+  capabilityId: string,
+  actionDigest: string
+): boolean {
+  const prefix = "urn:agentic-strata:artifact:";
+  if (!reference.startsWith(prefix)) {
+    return false;
+  }
+  const attestation = bundle.attestations.find(
+    (candidate) => candidate.attestationId === reference.slice(prefix.length)
+  );
+  if (
+    attestation === undefined ||
+    attestation.capabilityId !== capabilityId ||
+    attestation.subjectDigest !== actionDigest ||
+    !verifySeal(attestation)
+  ) {
+    return false;
+  }
+  const artifact = bundle.artifacts.find(
+    (candidate) => candidate.artifactRef === attestation.artifactRef
+  );
+  return (
+    artifact !== undefined &&
+    artifact.digest === attestation.artifactDigest &&
+    digestValue(artifact.payload) === artifact.digest
+  );
+}
+
 function referenceSealIssues(bundle: RunBundle): string[] {
   const issues: string[] = [];
   const sealed = [
     bundle.outcome,
     bundle.budgetUsage,
+    ...bundle.runtimeBoundaries,
+    ...bundle.criterionResults,
     ...bundle.authorityGrants,
     ...bundle.approvals,
     ...bundle.delegations,
@@ -129,6 +205,14 @@ function identityLineageIssues(bundle: RunBundle): string[] {
   if (bundle.budgetUsage.runId !== bundle.execution.runId) {
     issues.push("budget-usage:run");
   }
+  for (const result of bundle.criterionResults) {
+    if (
+      result.runId !== bundle.execution.runId ||
+      result.outcomeId !== bundle.outcome.outcomeId
+    ) {
+      issues.push(`criterion:${result.resultId}:run-outcome`);
+    }
+  }
   for (const approval of bundle.approvals) {
     if (!bundle.authorityGrants.some((grant) => grant.grantId === approval.authorityGrantId)) {
       issues.push(`approval:${approval.approvalId}:authority`);
@@ -147,6 +231,8 @@ function identityLineageIssues(bundle: RunBundle): string[] {
   }
 
   const identifierGroups: Array<[string, string[]]> = [
+    ["boundary", bundle.runtimeBoundaries.map((item) => item.boundaryEvidenceId)],
+    ["criterion-result", bundle.criterionResults.map((item) => item.resultId)],
     ["authority", bundle.authorityGrants.map((item) => item.grantId)],
     ["approval", bundle.approvals.map((item) => item.approvalId)],
     ["delegation", bundle.delegations.map((item) => item.delegationId)],
@@ -160,6 +246,224 @@ function identityLineageIssues(bundle: RunBundle): string[] {
     if (new Set(identifiers).size !== identifiers.length) {
       issues.push(`${kind}:duplicate-id`);
     }
+  }
+  return issues;
+}
+
+function grantLineageIssues(bundle: RunBundle): string[] {
+  const issues = new Set<string>();
+  const grants = new Map(bundle.authorityGrants.map((grant) => [grant.grantId, grant]));
+  let roots = 0;
+
+  for (const grant of bundle.authorityGrants) {
+    const validFrom = Date.parse(grant.validFrom);
+    const expiresAt = Date.parse(grant.expiresAt);
+    if (!Number.isFinite(validFrom) || !Number.isFinite(expiresAt) || expiresAt <= validFrom) {
+      issues.add(`${grant.grantId}:invalid-window`);
+    }
+    if (grant.parentGrantId === undefined) {
+      roots += 1;
+      if (grant.issuer.type === "service-policy") {
+        issues.add(`${grant.grantId}:untrusted-root`);
+      }
+      continue;
+    }
+    const parent = grants.get(grant.parentGrantId);
+    if (parent === undefined || !validateChildGrant(grant, parent).valid) {
+      issues.add(`${grant.grantId}:invalid-parent`);
+    }
+  }
+
+  for (const approval of bundle.approvals) {
+    const issuedAt = Date.parse(approval.issuedAt);
+    const expiresAt = Date.parse(approval.expiresAt);
+    if (!Number.isFinite(issuedAt) || !Number.isFinite(expiresAt) || expiresAt <= issuedAt) {
+      issues.add(`${approval.approvalId}:invalid-window`);
+    }
+  }
+
+  if (bundle.authorityGrants.length > 0 && roots === 0) {
+    issues.add("authority:no-trust-root");
+  }
+
+  for (const grant of bundle.authorityGrants) {
+    const visited = new Set<string>();
+    let cursor: AuthorityGrant | undefined = grant;
+    let depth = 0;
+    while (cursor?.parentGrantId !== undefined) {
+      if (visited.has(cursor.grantId) || depth >= bundle.authorityGrants.length) {
+        issues.add(`${grant.grantId}:cycle`);
+        break;
+      }
+      visited.add(cursor.grantId);
+      cursor = grants.get(cursor.parentGrantId);
+      depth += 1;
+      if (cursor === undefined) {
+        issues.add(`${grant.grantId}:missing-root`);
+        break;
+      }
+    }
+    if (cursor !== undefined && cursor.parentGrantId === undefined && cursor.issuer.type === "service-policy") {
+      issues.add(`${grant.grantId}:untrusted-root`);
+    }
+  }
+  return [...issues];
+}
+
+interface EvidenceNode {
+  reference: string;
+  timestamp: number;
+  dependencies: string[];
+}
+
+function evidenceCausalityIssues(bundle: RunBundle): string[] {
+  const nodes: EvidenceNode[] = [
+    ...bundle.authorityGrants.map((grant) => ({
+      reference: `urn:agentic-strata:authority:${grant.grantId}`,
+      timestamp: Date.parse(grant.validFrom),
+      dependencies: []
+    })),
+    ...bundle.approvals.map((approval) => ({
+      reference: `urn:agentic-strata:approval:${approval.approvalId}`,
+      timestamp: Date.parse(approval.issuedAt),
+      dependencies: [`urn:agentic-strata:authority:${approval.authorityGrantId}`]
+    })),
+    ...bundle.runtimeBoundaries.map((boundary) => ({
+      reference: `urn:agentic-strata:boundary:${boundary.boundaryEvidenceId}`,
+      timestamp: Date.parse(boundary.observedAt),
+      dependencies: []
+    })),
+    ...bundle.criterionResults.map((result) => ({
+      reference: `urn:agentic-strata:criterion:${result.resultId}`,
+      timestamp: Date.parse(result.observedAt),
+      dependencies: result.evidenceRefs
+    })),
+    ...bundle.decisions.map((decision) => ({
+      reference: `urn:agentic-strata:decision:${decision.decisionId}`,
+      timestamp: Date.parse(decision.createdAt),
+      dependencies: decision.evidenceRefs
+    })),
+    ...bundle.attestations.map((attestation) => ({
+      reference: `urn:agentic-strata:artifact:${attestation.attestationId}`,
+      timestamp: Date.parse(attestation.createdAt),
+      dependencies: attestation.provenanceRefs
+    })),
+    ...bundle.traceEvents.map((event) => ({
+      reference: `urn:agentic-strata:event:${event.eventId}`,
+      timestamp: Date.parse(event.occurredAt),
+      dependencies: event.evidenceRefs
+    }))
+  ];
+  const byReference = new Map(nodes.map((node) => [node.reference, node]));
+  const issues = new Set<string>();
+
+  for (const node of nodes) {
+    if (!Number.isFinite(node.timestamp)) {
+      issues.add(`${node.reference}:invalid-time`);
+    }
+    for (const dependency of node.dependencies) {
+      const evidence = byReference.get(dependency);
+      if (evidence === undefined) {
+        issues.add(`${node.reference}:missing:${dependency}`);
+      } else if (
+        Number.isFinite(node.timestamp) &&
+        Number.isFinite(evidence.timestamp) &&
+        evidence.timestamp > node.timestamp
+      ) {
+        issues.add(`${node.reference}:future:${dependency}`);
+      }
+    }
+  }
+
+  const state = new Map<string, "visiting" | "visited">();
+  const visit = (reference: string): void => {
+    const current = state.get(reference);
+    if (current === "visiting") {
+      issues.add(`${reference}:cycle`);
+      return;
+    }
+    if (current === "visited") {
+      return;
+    }
+    state.set(reference, "visiting");
+    for (const dependency of byReference.get(reference)?.dependencies ?? []) {
+      if (byReference.has(dependency)) {
+        visit(dependency);
+      }
+    }
+    state.set(reference, "visited");
+  };
+  for (const reference of byReference.keys()) {
+    visit(reference);
+  }
+  return [...issues];
+}
+
+function terminalReceiptIssues(bundle: RunBundle): string[] {
+  const terminalEvents = bundle.traceEvents.filter((event) =>
+    event.eventType === "run.completed" || event.eventType === "run.failed"
+  );
+  if (terminalEvents.length !== 1) {
+    return [`terminal-count:${terminalEvents.length}`];
+  }
+  return terminalEvents[0] === bundle.traceEvents.at(-1) ? [] : ["terminal-not-last"];
+}
+
+function runStatus(bundle: RunBundle): "completed" | "failed" | "incomplete" {
+  if (terminalReceiptIssues(bundle).length > 0) {
+    return "incomplete";
+  }
+  return bundle.traceEvents.at(-1)?.eventType === "run.completed" ? "completed" : "failed";
+}
+
+function outcomeEvidenceIssues(bundle: RunBundle): string[] {
+  const issues: string[] = [];
+  const known = evidenceIndex(bundle);
+  const terminal = bundle.traceEvents.at(-1);
+  const terminalStatus = runStatus(bundle);
+  const criterionIds = new Set(bundle.outcome.acceptanceCriteria.map((criterion) => criterion.id));
+
+  for (const result of bundle.criterionResults) {
+    if (!criterionIds.has(result.criterionId)) {
+      issues.push(`${result.resultId}:unknown-criterion`);
+    }
+    if (
+      result.evidenceRefs.some((reference) => !known.has(reference)) ||
+      !verifySeal(result)
+    ) {
+      issues.push(`${result.resultId}:invalid-evidence`);
+    }
+    if (!terminal?.evidenceRefs.includes(`urn:agentic-strata:criterion:${result.resultId}`)) {
+      issues.push(`${result.resultId}:not-terminally-bound`);
+    }
+  }
+
+  for (const criterion of bundle.outcome.acceptanceCriteria) {
+    const matches = bundle.criterionResults.filter(
+      (result) => result.criterionId === criterion.id
+    );
+    if (matches.length !== 1) {
+      issues.push(`${criterion.id}:result-count-${matches.length}`);
+      continue;
+    }
+    const result = matches[0];
+    if (result === undefined) {
+      continue;
+    }
+    if (criterion.evidenceRequired && result.evidenceRefs.length === 0) {
+      issues.push(`${criterion.id}:missing-evidence`);
+    }
+    if (terminalStatus === "completed" && result.status !== "passed") {
+      issues.push(`${criterion.id}:completed-without-pass`);
+    }
+  }
+
+  if (
+    terminalStatus === "failed" &&
+    bundle.criterionResults.length > 0 &&
+    bundle.criterionResults.every((result) => result.status === "passed")
+  ) {
+    issues.push("failed-run-with-all-criteria-passed");
   }
   return issues;
 }
@@ -219,27 +523,15 @@ function highRiskApprovalIssues(bundle: RunBundle): string[] {
     const grantId = event.attributes.authorityGrantId;
     const approvalId = event.attributes.approvalReceiptId;
     const actionDigest = event.attributes.actionDigest;
-    const actorId = event.attributes.actorId;
-    const resource = event.attributes.resource;
-    const grant =
-      typeof grantId === "string"
-        ? bundle.authorityGrants.find((candidate) => candidate.grantId === grantId)
-        : undefined;
     const approval =
       typeof approvalId === "string"
         ? bundle.approvals.find((candidate) => candidate.approvalId === approvalId)
         : undefined;
     const occurredAt = Date.parse(event.occurredAt);
-    const grantValid =
-      grant !== undefined &&
-      actorId === grant.subject &&
-      typeof resource === "string" &&
-      grant.resourcePatterns.includes(resource) &&
-      capability.authorityScopes.every((scope) => grant.scopes.includes(scope)) &&
-      occurredAt >= Date.parse(grant.validFrom) &&
-      occurredAt <= Date.parse(grant.expiresAt);
+    const grantValid = authorityForCommit(bundle, capability, event) !== undefined;
     const approvalValid =
       approval !== undefined &&
+      isDigest(actionDigest) &&
       approval.decision === "approved" &&
       approval.authorityGrantId === grantId &&
       approval.actionDigest === actionDigest &&
@@ -277,7 +569,8 @@ function sideEffectIssues(bundle: RunBundle): string[] {
     }
   }
 
-  const committedKeys = new Map<string, string>();
+  const committedKeys = new Set<string>();
+  const committedActions = new Set<string>();
   for (const commit of bundle.traceEvents.filter((event) => event.eventType === "capability.committed")) {
     const capability = capabilityFor(bundle, commit);
     if (capability === undefined) {
@@ -287,34 +580,48 @@ function sideEffectIssues(bundle: RunBundle): string[] {
       issues.push(`${commit.eventId}:commit-on-non-effectful-capability`);
       continue;
     }
-    const prepared = bundle.traceEvents.some(
+    const actionDigest = commit.attributes.actionDigest;
+    const idempotencyKey = commit.attributes.idempotencyKey;
+    const bindingValid = isDigest(actionDigest) && typeof idempotencyKey === "string" && idempotencyKey.length > 0;
+    const prepared = bindingValid && bundle.traceEvents.some(
       (event) =>
         event.eventType === "capability.prepared" &&
         event.sequence < commit.sequence &&
-        event.attributes.actionDigest === commit.attributes.actionDigest
+        event.attributes.capabilityId === capability.capabilityId &&
+        event.attributes.actionDigest === actionDigest &&
+        event.evidenceRefs.some((reference) =>
+          evidenceBindsAction(bundle, reference, capability.capabilityId, actionDigest)
+        )
     );
-    const terminal = bundle.traceEvents.some(
+    const terminal = bindingValid && bundle.traceEvents.some(
       (event) =>
         ((event.eventType === "capability.verified" && event.attributes.verified === true) ||
           event.eventType === "capability.compensated") &&
         event.sequence > commit.sequence &&
-        event.attributes.actionDigest === commit.attributes.actionDigest &&
+        event.attributes.capabilityId === capability.capabilityId &&
+        event.attributes.actionDigest === actionDigest &&
         event.evidenceRefs.some(
           (reference) =>
             reference.startsWith("urn:agentic-strata:artifact:") &&
-            knownEvidence.has(reference)
+            knownEvidence.has(reference) &&
+            evidenceBindsAction(bundle, reference, capability.capabilityId, actionDigest)
         )
     );
-    const idempotencyKey = commit.attributes.idempotencyKey;
-    if (!prepared || !terminal || typeof idempotencyKey !== "string") {
+    const authorized = authorityForCommit(bundle, capability, commit) !== undefined;
+    if (!bindingValid || !prepared || !terminal || !authorized) {
       issues.push(`${commit.eventId}:runtime`);
       continue;
     }
-    if (committedKeys.has(idempotencyKey)) {
-      issues.push(`${commit.eventId}:duplicate-commit`);
-    } else if (typeof commit.attributes.actionDigest === "string") {
-      committedKeys.set(idempotencyKey, commit.attributes.actionDigest);
+    const keyBinding = `${capability.capabilityId}:${idempotencyKey}`;
+    const actionBinding = `${capability.capabilityId}:${actionDigest}`;
+    if (committedKeys.has(keyBinding)) {
+      issues.push(`${commit.eventId}:duplicate-idempotency-key`);
     }
+    if (committedActions.has(actionBinding)) {
+      issues.push(`${commit.eventId}:duplicate-action`);
+    }
+    committedKeys.add(keyBinding);
+    committedActions.add(actionBinding);
   }
   return issues;
 }
@@ -330,6 +637,18 @@ function budgetIssues(bundle: RunBundle): string[] {
     usage.tokens > limit.maxTokens
   ) {
     issues.push("execution:consumption");
+  }
+  const observedAt = Date.parse(usage.observedAt);
+  const firstEventAt = Date.parse(bundle.traceEvents[0]?.occurredAt ?? "");
+  const lastEventAt = Date.parse(bundle.traceEvents.at(-1)?.occurredAt ?? "");
+  if (
+    !Number.isFinite(observedAt) ||
+    !Number.isFinite(firstEventAt) ||
+    !Number.isFinite(lastEventAt) ||
+    observedAt < firstEventAt ||
+    observedAt > lastEventAt
+  ) {
+    issues.push("execution:usage-time");
   }
   for (const grant of bundle.authorityGrants) {
     if (!budgetIsAttenuated(grant.budget, bundle.execution.budget)) {
@@ -406,6 +725,18 @@ const rules: Record<string, Rule> = {
       "The composite fingerprint binds semantic and operational cache partitions.",
       "The composite fingerprint is incomplete, stale, or bound to different runtime policy."
     ),
+  "outcome.acceptance-evidence": (bundle) => {
+    const issues = outcomeEvidenceIssues(bundle);
+    return check(
+      "outcome.acceptance-evidence",
+      issues.length === 0,
+      "Every acceptance criterion has one terminally bound, evidence-backed result.",
+      `Outcome evidence is missing, contradictory, or unbound at: ${issues.join(", ")}.`,
+      bundle.criterionResults.map(
+        (result) => `urn:agentic-strata:criterion:${result.resultId}`
+      )
+    );
+  },
   "lineage.contract-bindings": (bundle) => {
     const issues = identityLineageIssues(bundle);
     return check(
@@ -442,6 +773,15 @@ const rules: Record<string, Rule> = {
       `Runtime receipt replay found ${result.issues.length} integrity issue(s).`
     );
   },
+  "lineage.evidence-causality": (bundle) => {
+    const issues = evidenceCausalityIssues(bundle);
+    return check(
+      "lineage.evidence-causality",
+      issues.length === 0,
+      "Every evidence reference resolves backward through one acyclic causal graph.",
+      `Evidence is missing, cyclic, or from the future at: ${issues.join(", ")}.`
+    );
+  },
   "authority.budget-monotonicity": (bundle) => {
     const issues = budgetIssues(bundle);
     return check(
@@ -458,6 +798,15 @@ const rules: Record<string, Rule> = {
       issues.length === 0,
       "Delegations attenuate scope, resources, time, and budget.",
       `Delegation attenuation failed at: ${issues.join(", ")}.`
+    );
+  },
+  "authority.grant-lineage": (bundle) => {
+    const issues = grantLineageIssues(bundle);
+    return check(
+      "authority.grant-lineage",
+      issues.length === 0,
+      "Every authority grant reaches an acyclic human or identity-provider trust root.",
+      `Authority grant lineage is cyclic, unrooted, or temporally invalid at: ${issues.join(", ")}.`
     );
   },
   "authority.runtime-boundary": (bundle) => {
@@ -478,6 +827,19 @@ const rules: Record<string, Rule> = {
       `Unsafe side-effect lifecycle found at: ${issues.join(", ")}.`
     );
   },
+  "capability.schema-contracts": (bundle) => {
+    const issues = bundle.capabilities.flatMap(
+      (capability) => validateCapabilitySchemas(capability).issues
+    );
+    return check(
+      "capability.schema-contracts",
+      issues.length === 0,
+      "Every capability input and output contract compiles as JSON Schema 2020-12.",
+      `A capability schema is invalid or uses an unsupported dialect: ${issues
+        .map((issue) => issue.path)
+        .join(", ")}.`
+    );
+  },
   "evidence.summary-only": (bundle) => {
     const known = evidenceIndex(bundle);
     const valid = bundle.decisions.every(
@@ -492,18 +854,49 @@ const rules: Record<string, Rule> = {
       "A decision record discloses an unsupported representation or missing evidence."
     );
   },
+  "runtime.terminal-receipt": (bundle) => {
+    const issues = terminalReceiptIssues(bundle);
+    return check(
+      "runtime.terminal-receipt",
+      issues.length === 0,
+      `The run records one final ${runStatus(bundle)} terminal receipt.`,
+      `The run terminal receipt is missing, duplicated, or not final: ${issues.join(", ")}.`
+    );
+  },
+  "policy.profile-declared": (bundle, profile) =>
+    check(
+      "policy.profile-declared",
+      bundle.manifest.conformanceProfiles.includes(profile),
+      `The application manifest declares the selected ${profile} profile.`,
+      `The application manifest does not declare the selected ${profile} profile.`
+    ),
   "privacy.local-boundary": (bundle) => {
     const policy = bundle.manifest.policies;
+    const boundary = bundle.runtimeBoundaries.find(
+      (candidate) =>
+        candidate.runId === bundle.execution.runId &&
+        candidate.modelHosting === "local" &&
+        candidate.dataBoundary === "local" &&
+        candidate.networkEgressObserved === false &&
+        verifySeal(candidate)
+    );
+    const boundaryReference =
+      boundary === undefined
+        ? undefined
+        : `urn:agentic-strata:boundary:${boundary.boundaryEvidenceId}`;
     const valid =
       policy.defaultDataBoundary === "local" &&
       policy.allowedModelHosting.length === 1 &&
       policy.allowedModelHosting[0] === "local" &&
-      bundle.execution.profile === "privacy";
+      bundle.execution.profile === "privacy" &&
+      boundaryReference !== undefined &&
+      bundle.traceEvents.some((event) => event.evidenceRefs.includes(boundaryReference));
     return check(
       "privacy.local-boundary",
       valid,
-      "Data, compute, and execution profile are confined to the local boundary.",
-      "The local-private profile requires local data, local model hosting, and the privacy execution profile."
+      "Runtime evidence attests local data, local model hosting, no observed egress, and the privacy execution profile.",
+      "The local-private profile requires a sealed, receipt-linked runtime boundary observation in addition to local declarations.",
+      boundaryReference === undefined ? [] : [boundaryReference]
     );
   },
   "authority.high-risk-approval": (bundle) => {
@@ -558,28 +951,54 @@ export function runConformance(
   profile: ConformanceProfile,
   options: ConformanceOptions = {}
 ): ConformanceReport {
-  const configuration = options.configuration ?? loadProfileConfiguration();
+  const baseline = loadProfileConfiguration();
+  const configuration =
+    options.configuration === undefined
+      ? baseline
+      : extendProfileConfiguration(baseline, options.configuration);
   const selectedRules = resolveProfileRules(profile, configuration);
   const checks = selectedRules.map((ruleId) => {
     const rule = rules[ruleId];
     if (rule === undefined) {
       throw new Error(`Unknown conformance rule: ${ruleId}`);
     }
-    return rule(bundle);
+    return rule(bundle, profile);
   });
   const generatedAt = options.generatedAt ?? new Date().toISOString();
+  const runBundleDigest = digestValue(bundle);
+  const profileConfigurationDigest = digestValue(configuration);
+  const rulesDigest = digestValue(selectedRules);
+  const evaluationDigest = digestValue({
+    profile,
+    runBundleDigest,
+    profileConfigurationDigest,
+    rulesDigest,
+    generatedAt
+  });
   const unsigned: Omit<ConformanceReport, "digest"> = {
     contractType: "ConformanceReport",
     apiVersion: API_VERSION,
-    reportId: `report-${profile}-${bundle.execution.runId}`,
+    reportId: `report-${profile}-${evaluationDigest.slice(0, 24)}`,
     profile,
     status: checks.every((item) => item.status !== "fail") ? "pass" : "fail",
+    runStatus: runStatus(bundle),
     manifestDigest: digestValue(bundle.manifest),
-    runBundleDigest: digestValue(bundle),
+    runBundleDigest,
+    profileConfigurationDigest,
+    rulesDigest,
     generatedAt,
     checks
   };
-  return { ...unsigned, digest: digestValue(unsigned) };
+  const report: ConformanceReport = { ...unsigned, digest: digestValue(unsigned) };
+  const validation = validateAs("ConformanceReport", report);
+  if (!validation.valid) {
+    throw new Error(
+      `Generated conformance report is invalid: ${validation.issues
+        .map((issue) => `${issue.path} ${issue.code}`)
+        .join(", ")}`
+    );
+  }
+  return report;
 }
 
 export function reportIssues(report: ConformanceReport): ValidationIssue[] {

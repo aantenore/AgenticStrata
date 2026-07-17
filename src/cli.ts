@@ -79,7 +79,7 @@ program
   .description("Evaluate a manifest plus real runtime artifacts and receipt chain.")
   .argument("<bundle>")
   .option("-p, --profile <profile>", "conformance profile", parseProfile, "enterprise")
-  .option("--profiles <file>", "replace the packaged profile configuration")
+  .option("--profiles <file>", "extend the non-removable packaged profile baseline")
   .option("-o, --output <file>", "write the report as JSON")
   .action(
     (

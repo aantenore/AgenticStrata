@@ -1,39 +1,42 @@
 import { createHash } from "node:crypto";
 
+import serialize from "canonicalize";
+
 import type { Digest } from "../contracts/types.js";
 
-function normalize(value: unknown): unknown {
+function assertIJson(value: unknown, seen = new Set<object>()): void {
   if (value === null || typeof value === "string" || typeof value === "boolean") {
-    return value;
+    return;
   }
-
   if (typeof value === "number") {
     if (!Number.isFinite(value)) {
-      throw new TypeError("Only finite numbers can be canonicalized.");
+      throw new TypeError("RFC 8785 canonicalization accepts only finite JSON numbers.");
     }
-    return value;
+    return;
   }
-
-  if (Array.isArray(value)) {
-    return value.map((item) => normalize(item));
+  if (typeof value !== "object") {
+    throw new TypeError(`RFC 8785 canonicalization does not support ${typeof value}.`);
   }
-
-  if (typeof value === "object") {
-    const result: Record<string, unknown> = {};
-    const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([, item]) => item !== undefined)
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
-    for (const [key, item] of entries) {
-      result[key] = normalize(item);
-    }
-    return result;
+  if (seen.has(value)) {
+    throw new TypeError("RFC 8785 canonicalization does not support cyclic values.");
   }
-
-  throw new TypeError(`Unsupported canonical value: ${typeof value}`);
+  seen.add(value);
+  const values = Array.isArray(value)
+    ? value
+    : Object.values(value as Record<string, unknown>);
+  for (const item of values) {
+    assertIJson(item, seen);
+  }
+  seen.delete(value);
 }
 
 export function canonicalize(value: unknown): string {
-  return JSON.stringify(normalize(value));
+  assertIJson(value);
+  const result = serialize(value);
+  if (result === undefined) {
+    throw new TypeError("RFC 8785 canonicalization did not produce a JSON value.");
+  }
+  return result;
 }
 
 export function digestValue(value: unknown): Digest {

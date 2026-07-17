@@ -7,8 +7,10 @@
     { "$ref": "#/$defs/ApplicationManifest" },
     { "$ref": "#/$defs/IntentEnvelope" },
     { "$ref": "#/$defs/OutcomeContract" },
+    { "$ref": "#/$defs/CriterionResult" },
     { "$ref": "#/$defs/ExecutionEnvelope" },
     { "$ref": "#/$defs/BudgetUsage" },
+    { "$ref": "#/$defs/RuntimeBoundaryEvidence" },
     { "$ref": "#/$defs/AuthorityGrant" },
     { "$ref": "#/$defs/ApprovalReceipt" },
     { "$ref": "#/$defs/DelegationEnvelope" },
@@ -77,9 +79,45 @@
         "digest"
       ]
     },
+    "RuntimeBoundaryEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "RuntimeBoundaryEvidence" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "boundaryEvidenceId": { "$ref": "#/$defs/Identifier" },
+        "runId": { "$ref": "#/$defs/Identifier" },
+        "modelHosting": {
+          "type": "string",
+          "enum": ["local", "private-cloud", "managed"]
+        },
+        "dataBoundary": {
+          "type": "string",
+          "enum": ["local", "tenant", "regional", "global"]
+        },
+        "networkEgressObserved": { "type": "boolean" },
+        "endpointDigest": { "$ref": "#/$defs/Digest" },
+        "producer": { "$ref": "#/$defs/Identifier" },
+        "observedAt": { "type": "string", "format": "date-time" },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "boundaryEvidenceId",
+        "runId",
+        "modelHosting",
+        "dataBoundary",
+        "networkEgressObserved",
+        "endpointDigest",
+        "producer",
+        "observedAt",
+        "digest"
+      ]
+    },
     "EvidenceReference": {
       "type": "string",
-      "pattern": "^urn:agentic-strata:(artifact|approval|authority|decision|event):[a-zA-Z0-9._:-]+$"
+      "pattern": "^urn:agentic-strata:(artifact|approval|authority|boundary|criterion|decision|event):[a-zA-Z0-9._:-]+$"
     },
     "SemanticFingerprint": {
       "type": "object",
@@ -351,6 +389,43 @@
         "digest"
       ]
     },
+    "CriterionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "CriterionResult" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "resultId": { "$ref": "#/$defs/Identifier" },
+        "runId": { "$ref": "#/$defs/Identifier" },
+        "outcomeId": { "$ref": "#/$defs/Identifier" },
+        "criterionId": { "$ref": "#/$defs/Identifier" },
+        "status": {
+          "type": "string",
+          "enum": ["passed", "failed", "not-evaluated"]
+        },
+        "summary": { "type": "string", "minLength": 1 },
+        "evidenceRefs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EvidenceReference" },
+          "uniqueItems": true
+        },
+        "observedAt": { "type": "string", "format": "date-time" },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "resultId",
+        "runId",
+        "outcomeId",
+        "criterionId",
+        "status",
+        "summary",
+        "evidenceRefs",
+        "observedAt",
+        "digest"
+      ]
+    },
     "ExecutionEnvelope": {
       "type": "object",
       "additionalProperties": false,
@@ -545,8 +620,30 @@
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
         },
-        "inputSchema": { "type": "object" },
-        "outputSchema": { "type": "object" },
+        "schemaDialect": {
+          "type": "string",
+          "const": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "$schema": {
+              "type": "string",
+              "const": "https://json-schema.org/draft/2020-12/schema"
+            }
+          },
+          "required": ["$schema"]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "$schema": {
+              "type": "string",
+              "const": "https://json-schema.org/draft/2020-12/schema"
+            }
+          },
+          "required": ["$schema"]
+        },
         "sideEffectPolicy": {
           "type": "object",
           "additionalProperties": false,
@@ -569,6 +666,7 @@
         "effectClass",
         "operations",
         "authorityScopes",
+        "schemaDialect",
         "inputSchema",
         "outputSchema",
         "sideEffectPolicy",
@@ -635,6 +733,8 @@
         "attestationId": { "$ref": "#/$defs/Identifier" },
         "artifactRef": { "type": "string", "minLength": 1 },
         "artifactDigest": { "$ref": "#/$defs/Digest" },
+        "capabilityId": { "$ref": "#/$defs/Identifier" },
+        "subjectDigest": { "$ref": "#/$defs/Digest" },
         "producer": { "$ref": "#/$defs/Identifier" },
         "createdAt": { "type": "string", "format": "date-time" },
         "provenanceRefs": {
@@ -722,6 +822,70 @@
         },
         "digest": { "$ref": "#/$defs/Digest" }
       },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "eventType": {
+                "enum": [
+                  "capability.prepared",
+                  "capability.committed",
+                  "capability.verified",
+                  "capability.compensated"
+                ]
+              }
+            },
+            "required": ["eventType"]
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "properties": {
+                  "capabilityId": { "$ref": "#/$defs/Identifier" },
+                  "actionDigest": { "$ref": "#/$defs/Digest" }
+                },
+                "required": ["capabilityId", "actionDigest"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "eventType": { "const": "capability.committed" } },
+            "required": ["eventType"]
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "properties": {
+                  "authorityGrantId": { "$ref": "#/$defs/Identifier" },
+                  "actorId": { "$ref": "#/$defs/Identifier" },
+                  "resource": { "type": "string", "minLength": 1 },
+                  "idempotencyKey": { "type": "string", "minLength": 1 }
+                },
+                "required": ["authorityGrantId", "actorId", "resource", "idempotencyKey"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "eventType": { "const": "capability.verified" } },
+            "required": ["eventType"]
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "properties": { "verified": { "const": true } },
+                "required": ["verified"]
+              }
+            }
+          }
+        }
+      ],
       "required": [
         "contractType",
         "apiVersion",
@@ -766,8 +930,14 @@
           "enum": ["core", "local-private", "enterprise", "regulated", "distributed"]
         },
         "status": { "type": "string", "enum": ["pass", "fail"] },
+        "runStatus": {
+          "type": "string",
+          "enum": ["completed", "failed", "incomplete"]
+        },
         "manifestDigest": { "$ref": "#/$defs/Digest" },
         "runBundleDigest": { "$ref": "#/$defs/Digest" },
+        "profileConfigurationDigest": { "$ref": "#/$defs/Digest" },
+        "rulesDigest": { "$ref": "#/$defs/Digest" },
         "generatedAt": { "type": "string", "format": "date-time" },
         "checks": {
           "type": "array",
@@ -782,8 +952,11 @@
         "reportId",
         "profile",
         "status",
+        "runStatus",
         "manifestDigest",
         "runBundleDigest",
+        "profileConfigurationDigest",
+        "rulesDigest",
         "generatedAt",
         "checks",
         "digest"
@@ -842,6 +1015,14 @@
         "outcome": { "$ref": "#/$defs/OutcomeContract" },
         "execution": { "$ref": "#/$defs/ExecutionEnvelope" },
         "budgetUsage": { "$ref": "#/$defs/BudgetUsage" },
+        "runtimeBoundaries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RuntimeBoundaryEvidence" }
+        },
+        "criterionResults": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CriterionResult" }
+        },
         "authorityGrants": { "type": "array", "items": { "$ref": "#/$defs/AuthorityGrant" } },
         "approvals": { "type": "array", "items": { "$ref": "#/$defs/ApprovalReceipt" } },
         "delegations": { "type": "array", "items": { "$ref": "#/$defs/DelegationEnvelope" } },
@@ -859,6 +1040,8 @@
         "outcome",
         "execution",
         "budgetUsage",
+        "runtimeBoundaries",
+        "criterionResults",
         "authorityGrants",
         "approvals",
         "delegations",

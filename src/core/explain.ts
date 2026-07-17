@@ -12,19 +12,52 @@ export function explainRun(bundle: RunBundle, report?: ConformanceReport): strin
   const replay = verifyTraceChain(bundle.traceEvents, evidenceIndex(bundle));
   const commitEvents = bundle.traceEvents.filter((event) => event.eventType === "capability.committed");
   const verificationEvents = bundle.traceEvents.filter((event) => event.eventType === "capability.verified");
+  const terminalEvents = bundle.traceEvents.filter(
+    (event) => event.eventType === "run.completed" || event.eventType === "run.failed"
+  );
+  const terminal = terminalEvents.length === 1 ? terminalEvents[0] : undefined;
+  const observedRunStatus =
+    report?.runStatus ??
+    (terminal?.eventType === "run.completed"
+      ? "completed"
+      : terminal?.eventType === "run.failed"
+        ? "failed"
+        : "incomplete");
   const lines = [
     `# Run explanation: ${bundle.execution.runId}`,
+    "",
+    "## Run result",
+    "",
+    `- Run status: ${observedRunStatus}`,
+    `- Terminal receipt: ${terminal?.summary ?? "No unique terminal receipt was recorded."}`,
+    `- Conformance status: ${report?.status ?? "not evaluated"}`,
+    ...(observedRunStatus === "failed"
+      ? ["- The requested outcome is not reported as achieved."]
+      : []),
     "",
     "## Requested and bound",
     "",
     `- Canonical intent: ${bundle.intent.canonicalIntent}`,
     `- Intent confidence: ${bundle.intent.confidence}`,
     `- Intent ambiguity: ${bundle.intent.ambiguity}`,
-    `- Outcome: ${bundle.outcome.objective}`,
+    `- Outcome target: ${bundle.outcome.objective}`,
     `- Execution profile: ${bundle.execution.profile}`,
     `- Privacy partition: ${bundle.execution.privacyPartition}`,
     `- Composite fingerprint: ${bundle.intent.fingerprint.digest}`,
     `- Safe cache key: ${bundle.intent.fingerprint.cacheKey}`,
+    "",
+    "## Acceptance evidence",
+    "",
+    ...bundle.outcome.acceptanceCriteria.map((criterion) => {
+      const result = bundle.criterionResults.find(
+        (candidate) => candidate.criterionId === criterion.id
+      );
+      return result === undefined
+        ? `- [missing] ${criterion.id}: ${criterion.assertion}`
+        : `- [${result.status}] ${criterion.id}: ${result.summary} Evidence: ${
+            result.evidenceRefs.join(", ") || "none"
+          }.`;
+    }),
     "",
     "## Authority and collaboration",
     "",
@@ -75,7 +108,8 @@ export function explainRun(bundle: RunBundle, report?: ConformanceReport): strin
       "## Conformance",
       "",
       `- Profile: ${report.profile}`,
-      `- Status: ${report.status}`,
+      `- Conformance status: ${report.status}`,
+      `- Run status: ${report.runStatus}`,
       ...report.checks.map((item) => `- [${item.status}] ${item.id}: ${item.message}`)
     );
   }

@@ -7,15 +7,21 @@ profiles:
       - architecture.complete-strata
       - architecture.dependency-direction
       - fingerprint.operational-bindings
+      - outcome.acceptance-evidence
       - lineage.contract-bindings
       - lineage.external-specifications
       - lineage.runtime-artifacts
       - lineage.receipt-chain
+      - lineage.evidence-causality
       - authority.budget-monotonicity
       - authority.delegation-attenuation
+      - authority.grant-lineage
       - authority.runtime-boundary
       - capability.side-effect-safety
+      - capability.schema-contracts
       - evidence.summary-only
+      - runtime.terminal-receipt
+      - policy.profile-declared
   local-private:
     extends: [core]
     rules:

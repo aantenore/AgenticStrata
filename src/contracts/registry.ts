@@ -5,7 +5,12 @@ import { Ajv2020, type ErrorObject, type ValidateFunction } from "ajv/dist/2020.
 import addFormatsImport from "ajv-formats";
 import type { FormatsPlugin } from "ajv-formats";
 
-import type { ContractType, ValidationIssue, ValidationResult } from "./types.js";
+import type {
+  CapabilityContract,
+  ContractType,
+  ValidationIssue,
+  ValidationResult
+} from "./types.js";
 
 const schemaPath = fileURLToPath(
   new URL("../../schemas/v1/agentic-strata.schema.json", import.meta.url)
@@ -75,12 +80,37 @@ export function validateDocument(document: unknown): ValidationResult {
   return validateAs(contractType as ContractType, document);
 }
 
+export function validateCapabilitySchemas(
+  capability: CapabilityContract
+): ValidationResult {
+  const issues: ValidationIssue[] = [];
+  for (const [name, value] of [
+    ["inputSchema", capability.inputSchema],
+    ["outputSchema", capability.outputSchema]
+  ] as const) {
+    try {
+      const compiler = new Ajv2020({ strict: true, allErrors: true });
+      addFormats(compiler);
+      compiler.compile(value);
+    } catch (error: unknown) {
+      issues.push({
+        path: `/capabilities/${capability.capabilityId}/${name}`,
+        code: "json-schema",
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+  return { valid: issues.length === 0, issues };
+}
+
 export const contractTypes = new Set<ContractType>([
   "ApplicationManifest",
   "IntentEnvelope",
   "OutcomeContract",
+  "CriterionResult",
   "ExecutionEnvelope",
   "BudgetUsage",
+  "RuntimeBoundaryEvidence",
   "AuthorityGrant",
   "ApprovalReceipt",
   "DelegationEnvelope",

@@ -25,16 +25,32 @@ const input: FingerprintInput = {
 };
 
 describe("canonical contracts", () => {
-  it("orders keys deterministically and omits undefined object properties", () => {
-    expect(canonicalize({ z: 1, a: { y: undefined, b: true, a: false } })).toBe(
+  it("matches RFC 8785 key ordering and number serialization vectors", () => {
+    expect(canonicalize({ z: 1, a: { b: true, a: false } })).toBe(
       '{"a":{"a":false,"b":true},"z":1}'
+    );
+    expect(canonicalize([Number("333333333.33333329"), 1e30, 4.5, 2e-3, 1e-27])).toBe(
+      "[333333333.3333333,1e+30,4.5,0.002,1e-27]"
+    );
+    expect(
+      canonicalize({
+        "1": { f: { f: "hi", F: 5 }, "\n": 56 },
+        "10": {},
+        "": "empty",
+        a: {},
+        "111": [{ e: "yes", E: "no" }],
+        A: {}
+      })
+    ).toBe(
+      '{"":"empty","1":{"\\n":56,"f":{"F":5,"f":"hi"}},"10":{},"111":[{"E":"no","e":"yes"}],"A":{},"a":{}}'
     );
     expect(digestValue({ b: 2, a: 1 })).toBe(digestValue({ a: 1, b: 2 }));
   });
 
   it("rejects values outside the JSON contract", () => {
     expect(() => canonicalize(Number.NaN)).toThrow("finite");
-    expect(() => canonicalize(Symbol("unsupported"))).toThrow("Unsupported");
+    expect(() => canonicalize({ value: undefined })).toThrow("does not support undefined");
+    expect(() => canonicalize(Symbol("unsupported"))).toThrow("does not support symbol");
   });
 
   it("seals and detects mutation", () => {

@@ -6,6 +6,7 @@ import type {
   AuthorityGrant,
   BudgetUsage,
   CapabilityContract,
+  CriterionResult,
   DecisionEvidence,
   DelegationEnvelope,
   IntentEnvelope,
@@ -46,13 +47,25 @@ export function runDemo(now = "2026-07-17T12:00:00.000Z"): DemoResult {
     effectClass: "write",
     operations: ["prepare", "commit", "verify", "compensate"],
     authorityScopes: ["change:commit"],
+    schemaDialect: "https://json-schema.org/draft/2020-12/schema",
     inputSchema: {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
       type: "object",
+      properties: {
+        resource: { type: "string", minLength: 1 },
+        key: { type: "string", minLength: 1 },
+        value: {}
+      },
       required: ["resource", "key", "value"],
       additionalProperties: false
     },
     outputSchema: {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
       type: "object",
+      properties: {
+        actionDigest: { type: "string", pattern: "^[a-f0-9]{64}$" },
+        committedAt: { type: "string", format: "date-time" }
+      },
       required: ["actionDigest", "committedAt"],
       additionalProperties: true
     },
@@ -252,6 +265,8 @@ export function runDemo(now = "2026-07-17T12:00:00.000Z"): DemoResult {
     attestationId: "attestation-prepared-001",
     artifactRef: preparedArtifact.artifactRef,
     artifactDigest: preparedArtifact.digest,
+    capabilityId: capability.capabilityId,
+    subjectDigest: prepared.actionDigest,
     producer: "capability-generic-change",
     createdAt: now,
     provenanceRefs: [`urn:agentic-strata:authority:${authority.grantId}`]
@@ -262,6 +277,8 @@ export function runDemo(now = "2026-07-17T12:00:00.000Z"): DemoResult {
     attestationId: "attestation-result-001",
     artifactRef: resultArtifact.artifactRef,
     artifactDigest: resultArtifact.digest,
+    capabilityId: capability.capabilityId,
+    subjectDigest: prepared.actionDigest,
     producer: "capability-generic-change",
     createdAt: now,
     provenanceRefs: [
@@ -269,6 +286,23 @@ export function runDemo(now = "2026-07-17T12:00:00.000Z"): DemoResult {
       `urn:agentic-strata:approval:${approval.approvalId}`
     ]
   });
+  const criterionResults: CriterionResult[] = outcome.acceptanceCriteria.map((criterion) =>
+    seal({
+      contractType: "CriterionResult" as const,
+      apiVersion: API_VERSION,
+      resultId: `result-${criterion.id}`,
+      runId,
+      outcomeId: outcome.outcomeId,
+      criterionId: criterion.id,
+      status: "passed" as const,
+      summary:
+        criterion.id === "criterion-value"
+          ? "Independent read-back matched the approved target value."
+          : "The duplicate attempt returned the original receipt without a second commit.",
+      evidenceRefs: [`urn:agentic-strata:artifact:${resultAttestation.attestationId}`],
+      observedAt: now
+    })
+  );
   const decision: DecisionEvidence = seal({
     contractType: "DecisionEvidence",
     apiVersion: API_VERSION,
@@ -418,7 +452,10 @@ export function runDemo(now = "2026-07-17T12:00:00.000Z"): DemoResult {
     eventType: "run.completed",
     stratum: "interaction",
     summary: "Outcome criteria passed with verified runtime evidence.",
-    evidenceRefs: [`urn:agentic-strata:artifact:${resultAttestation.attestationId}`]
+    evidenceRefs: [
+      `urn:agentic-strata:artifact:${resultAttestation.attestationId}`,
+      ...criterionResults.map((result) => `urn:agentic-strata:criterion:${result.resultId}`)
+    ]
   });
 
   return {
@@ -430,6 +467,8 @@ export function runDemo(now = "2026-07-17T12:00:00.000Z"): DemoResult {
       outcome,
       execution,
       budgetUsage,
+      runtimeBoundaries: [],
+      criterionResults,
       authorityGrants: [authority],
       approvals: [approval],
       delegations: [delegation],

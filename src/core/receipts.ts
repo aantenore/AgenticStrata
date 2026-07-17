@@ -43,6 +43,12 @@ function artifactRef(attestation: ArtifactAttestation): string {
 export function evidenceIndex(bundle: RunBundle): Set<string> {
   return new Set([
     ...bundle.authorityGrants.map(authorityRef),
+    ...bundle.runtimeBoundaries.map(
+      (boundary) => `urn:agentic-strata:boundary:${boundary.boundaryEvidenceId}`
+    ),
+    ...bundle.criterionResults.map(
+      (result) => `urn:agentic-strata:criterion:${result.resultId}`
+    ),
     ...bundle.approvals.map(approvalRef),
     ...bundle.decisions.map(decisionRef),
     ...bundle.attestations.map(artifactRef),

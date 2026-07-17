@@ -53,6 +53,20 @@ export interface BudgetUsage {
   digest: Digest;
 }
 
+export interface RuntimeBoundaryEvidence {
+  contractType: "RuntimeBoundaryEvidence";
+  apiVersion: ApiVersion;
+  boundaryEvidenceId: string;
+  runId: string;
+  modelHosting: "local" | "private-cloud" | "managed";
+  dataBoundary: "local" | "tenant" | "regional" | "global";
+  networkEgressObserved: boolean;
+  endpointDigest: Digest;
+  producer: string;
+  observedAt: string;
+  digest: Digest;
+}
+
 export type PrivacyPartition = "public" | "tenant" | "private" | "restricted";
 
 export interface SemanticFingerprint {
@@ -151,6 +165,20 @@ export interface OutcomeContract {
   digest: Digest;
 }
 
+export interface CriterionResult {
+  contractType: "CriterionResult";
+  apiVersion: ApiVersion;
+  resultId: string;
+  runId: string;
+  outcomeId: string;
+  criterionId: string;
+  status: "passed" | "failed" | "not-evaluated";
+  summary: string;
+  evidenceRefs: EvidenceRef[];
+  observedAt: string;
+  digest: Digest;
+}
+
 export interface ExecutionEnvelope {
   contractType: "ExecutionEnvelope";
   apiVersion: ApiVersion;
@@ -227,6 +255,7 @@ export interface CapabilityContract {
   effectClass: "read" | "draft" | "write" | "external" | "destructive";
   operations: Array<"prepare" | "commit" | "verify" | "compensate">;
   authorityScopes: string[];
+  schemaDialect: "https://json-schema.org/draft/2020-12/schema";
   inputSchema: Record<string, unknown>;
   outputSchema: Record<string, unknown>;
   sideEffectPolicy: {
@@ -267,6 +296,8 @@ export interface ArtifactAttestation {
   attestationId: string;
   artifactRef: string;
   artifactDigest: Digest;
+  capabilityId?: string;
+  subjectDigest?: Digest;
   producer: string;
   createdAt: string;
   provenanceRefs: EvidenceRef[];
@@ -318,8 +349,11 @@ export interface ConformanceReport {
   reportId: string;
   profile: ConformanceProfile;
   status: "pass" | "fail";
+  runStatus: "completed" | "failed" | "incomplete";
   manifestDigest: Digest;
   runBundleDigest: Digest;
+  profileConfigurationDigest: Digest;
+  rulesDigest: Digest;
   generatedAt: string;
   checks: ConformanceCheck[];
   digest: Digest;
@@ -349,6 +383,8 @@ export interface RunBundle {
   outcome: OutcomeContract;
   execution: ExecutionEnvelope;
   budgetUsage: BudgetUsage;
+  runtimeBoundaries: RuntimeBoundaryEvidence[];
+  criterionResults: CriterionResult[];
   authorityGrants: AuthorityGrant[];
   approvals: ApprovalReceipt[];
   delegations: DelegationEnvelope[];
@@ -363,8 +399,10 @@ export type ContractType =
   | ApplicationManifest["contractType"]
   | IntentEnvelope["contractType"]
   | OutcomeContract["contractType"]
+  | CriterionResult["contractType"]
   | ExecutionEnvelope["contractType"]
   | BudgetUsage["contractType"]
+  | RuntimeBoundaryEvidence["contractType"]
   | AuthorityGrant["contractType"]
   | ApprovalReceipt["contractType"]
   | DelegationEnvelope["contractType"]

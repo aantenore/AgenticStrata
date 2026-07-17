@@ -98,3 +98,29 @@ export function resolveProfileRules(
   visit(profile);
   return resolved;
 }
+
+export function extendProfileConfiguration(
+  baseline: ProfileConfiguration,
+  extension: ProfileConfiguration
+): ProfileConfiguration {
+  if (
+    baseline.apiVersion !== "agenticstrata.dev/v1" ||
+    extension.apiVersion !== baseline.apiVersion
+  ) {
+    throw new Error("Conformance profile extensions must use the packaged API version.");
+  }
+
+  const profiles = {} as Record<ConformanceProfile, ProfileDefinition>;
+  for (const profile of CONFORMANCE_PROFILES) {
+    const base = baseline.profiles[profile];
+    const extra = extension.profiles[profile];
+    if (base === undefined || extra === undefined) {
+      throw new Error(`Missing conformance profile while extending: ${profile}`);
+    }
+    profiles[profile] = {
+      extends: [...new Set([...base.extends, ...extra.extends])],
+      rules: [...new Set([...base.rules, ...extra.rules])]
+    };
+  }
+  return { apiVersion: baseline.apiVersion, profiles };
+}
