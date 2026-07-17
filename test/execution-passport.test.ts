@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  API_VERSION,
   EXECUTION_PASSPORT_PREDICATE_TYPE,
   EXECUTION_PASSPORT_SUBJECTS,
   appendTraceEvent,
@@ -16,12 +17,26 @@ import {
 import type {
   ConformanceReport,
   ExecutionEvidenceBinding,
-  RunBundle
+  RunBundle,
+  RuntimeBoundaryEvidence
 } from "../src/index.js";
 
 const GENERATED_AT = "2026-07-17T12:00:00.000Z";
 const ISSUED_AT = "2026-07-17T12:00:01.000Z";
 const OASF_MEDIA_TYPE = "application/json";
+const LATE_OBSERVATION = "2026-07-17T13:00:00.000Z";
+const INVALID_EXTERNAL_URIS = [
+  "data:text/plain;base64,U0VDUkVU",
+  "blob:https://example.test/opaque",
+  "javascript:alert(1)",
+  "file:///tmp/private.json",
+  "filesystem:https://example.test/private.json",
+  "c:/Users/antonio/private.json",
+  "https://user:password@example.test/private.json",
+  "https://example.test/private.json?token=secret",
+  "https://example.test/private.json#secret",
+  `urn:example:${"a".repeat(2048)}`
+] as const;
 
 function reportFor(bundle: RunBundle): ConformanceReport {
   return runConformance(bundle, "enterprise", { generatedAt: GENERATED_AT });
@@ -163,19 +178,55 @@ describe("Execution Passport", () => {
     ).toThrow("is duplicated");
   });
 
-  it("rejects local subject locations and non-canonical descriptor extensions", () => {
+  it("rejects inline, credentialed, unstable, oversized, and local subject URIs", () => {
     const bundle = runDemo().bundle;
     const report = reportFor(bundle);
-    expect(() =>
-      createExecutionPassport({
-        bundle,
-        report,
-        oasfRecord: { opaqueExternalRecord: true },
-        oasfMediaType: OASF_MEDIA_TYPE,
-        subjectUris: { oasfRecord: "file:///tmp/oasf.json" },
-        issuedAt: ISSUED_AT
-      })
-    ).toThrow("Execution Passport is invalid");
+    for (const uri of INVALID_EXTERNAL_URIS) {
+      expect(() =>
+        createExecutionPassport({
+          bundle,
+          report,
+          oasfRecord: { opaqueExternalRecord: true },
+          oasfMediaType: OASF_MEDIA_TYPE,
+          subjectUris: { oasfRecord: uri },
+          issuedAt: ISSUED_AT
+        })
+      ).toThrow("Execution Passport is invalid");
+    }
+
+    const stable = createExecutionPassport({
+      bundle,
+      report,
+      oasfRecord: { opaqueExternalRecord: true },
+      oasfMediaType: OASF_MEDIA_TYPE,
+      subjectUris: {
+        runBundle: "https://example.test/runs/bundle.json",
+        oasfRecord: "urn:example:oasf:record-1"
+      },
+      issuedAt: ISSUED_AT
+    });
+    expect(stable.subject[0].uri).toBe("https://example.test/runs/bundle.json");
+    expect(stable.subject[2].uri).toBe("urn:example:oasf:record-1");
+  });
+
+  it("rejects inline, credentialed, unstable, oversized, and local evidence URIs", () => {
+    const bundle = runDemo().bundle;
+    const report = reportFor(bundle);
+    const evidence = contentFreeEvidence();
+    for (const uri of INVALID_EXTERNAL_URIS) {
+      const invalid = {
+        ...evidence,
+        resource: { ...evidence.resource, uri }
+      };
+      expect(() => create(bundle, report, { executionEvidence: [invalid] })).toThrow(
+        "Execution evidence binding 0 is invalid"
+      );
+    }
+  });
+
+  it("rejects non-canonical descriptor extensions", () => {
+    const bundle = runDemo().bundle;
+    const report = reportFor(bundle);
 
     const passport = create(bundle, report);
     expect(validateAs("ExecutionPassport", { ...passport, signatures: [] }).valid).toBe(false);
@@ -195,6 +246,43 @@ describe("Execution Passport", () => {
       evaluator: { ...report.evaluator, digest: "0".repeat(64) }
     });
     expect(() => create(bundle, invalidEvaluator)).toThrow("evaluator seal does not match");
+  });
+
+  it("rejects a passing report that contains a failed check", () => {
+    const bundle = runDemo().bundle;
+    const report = reportFor(bundle);
+    const checks = structuredClone(report.checks);
+    const first = checks[0];
+    if (first === undefined) throw new Error("conformance checks missing");
+    checks[0] = {
+      ...first,
+      status: "fail",
+      severity: "error",
+      message: "Deliberate failed check."
+    };
+    const inconsistent = resealReport(report, { status: "pass", checks });
+    expect(() => create(bundle, inconsistent)).toThrow("status pass does not match fail");
+  });
+
+  it("binds the ordered unique check identifiers to the rules digest", () => {
+    const bundle = runDemo().bundle;
+    const report = reportFor(bundle);
+    const first = report.checks[0];
+    if (first === undefined) throw new Error("conformance checks missing");
+
+    const duplicateChecks = [...report.checks, structuredClone(first)];
+    const duplicate = resealReport(report, {
+      checks: duplicateChecks,
+      rulesDigest: digestValue(duplicateChecks.map((check) => check.id))
+    });
+    expect(() => create(bundle, duplicate)).toThrow("duplicate check identifiers");
+
+    for (const checks of [report.checks.slice(1), [...report.checks].reverse()]) {
+      const inconsistent = resealReport(report, { checks });
+      expect(() => create(bundle, inconsistent)).toThrow(
+        "rules digest does not match its ordered checks"
+      );
+    }
   });
 
   it("rejects a report whose stated run status differs from the receipt history", () => {
@@ -227,5 +315,104 @@ describe("Execution Passport", () => {
         issuedAt: "2026-07-17T11:59:59.000Z"
       })
     ).toThrow("cannot precede");
+  });
+
+  it("requires report generation after every observed evidence timestamp", () => {
+    const cases: Array<{
+      label: string;
+      mutate: (bundle: RunBundle) => void;
+    }> = [
+      {
+        label: "trace event",
+        mutate: (bundle) => {
+          const terminal = bundle.traceEvents.at(-1);
+          if (terminal === undefined) throw new Error("terminal receipt missing");
+          bundle.traceEvents[bundle.traceEvents.length - 1] = seal({
+            ...omitDigest(terminal),
+            occurredAt: LATE_OBSERVATION
+          });
+        }
+      },
+      {
+        label: "budget usage",
+        mutate: (bundle) => {
+          bundle.budgetUsage = seal({
+            ...omitDigest(bundle.budgetUsage),
+            observedAt: LATE_OBSERVATION
+          });
+        }
+      },
+      {
+        label: "runtime boundary",
+        mutate: (bundle) => {
+          const boundary: Omit<RuntimeBoundaryEvidence, "digest"> = {
+            contractType: "RuntimeBoundaryEvidence",
+            apiVersion: API_VERSION,
+            boundaryEvidenceId: "boundary-late-observation",
+            runId: bundle.execution.runId,
+            modelHosting: "managed",
+            dataBoundary: "global",
+            networkEgressObserved: true,
+            endpointDigest: digestValue({ endpoint: "redacted" }),
+            producer: "boundary-observer",
+            observationStartedAt: GENERATED_AT,
+            observedAt: LATE_OBSERVATION
+          };
+          bundle.runtimeBoundaries.push(seal(boundary));
+        }
+      },
+      {
+        label: "criterion result",
+        mutate: (bundle) => {
+          const criterion = bundle.criterionResults[0];
+          if (criterion === undefined) throw new Error("criterion result missing");
+          bundle.criterionResults[0] = seal({
+            ...omitDigest(criterion),
+            observedAt: LATE_OBSERVATION
+          });
+        }
+      },
+      {
+        label: "decision",
+        mutate: (bundle) => {
+          const decision = bundle.decisions[0];
+          if (decision === undefined) throw new Error("decision evidence missing");
+          bundle.decisions[0] = seal({
+            ...omitDigest(decision),
+            createdAt: LATE_OBSERVATION
+          });
+        }
+      },
+      {
+        label: "artifact attestation",
+        mutate: (bundle) => {
+          const attestation = bundle.attestations[0];
+          if (attestation === undefined) throw new Error("artifact attestation missing");
+          bundle.attestations[0] = seal({
+            ...omitDigest(attestation),
+            createdAt: LATE_OBSERVATION
+          });
+        }
+      },
+      {
+        label: "approval",
+        mutate: (bundle) => {
+          const approval = bundle.approvals[0];
+          if (approval === undefined) throw new Error("approval receipt missing");
+          bundle.approvals[0] = seal({
+            ...omitDigest(approval),
+            issuedAt: LATE_OBSERVATION
+          });
+        }
+      }
+    ];
+
+    for (const testCase of cases) {
+      const bundle = structuredClone(runDemo().bundle);
+      testCase.mutate(bundle);
+      expect(() => create(bundle, reportFor(bundle)), testCase.label).toThrow(
+        "The ConformanceReport cannot precede"
+      );
+    }
   });
 });

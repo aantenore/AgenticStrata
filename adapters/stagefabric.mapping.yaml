@@ -7,9 +7,9 @@ direction: inbound
 contractBindings:
   - strataContract: ExecutionEvidenceBinding
     protocolObject: ExecutionPlacementEvidence ResourceDescriptor
-    notes: Only role, producer, disclosure mode, resource name, canonical digest, media type, and optional external URI are admitted.
+    notes: Only role, producer, disclosure mode, resource name, canonical digest, media type, and an optional bounded stable HTTPS or URN reference are admitted; metadata must be trusted and redacted or pseudonymized when sensitive.
   - strataContract: ExecutionPassport
     protocolObject: predicate executionEvidence entry
-    notes: Inputs, outputs, prompts, response bodies, endpoints, raw errors, full plans, and provider payloads are explicitly excluded.
+    notes: No payload or content field is admitted; the full provider result remains outside the mapping.
 lossPolicy: explicit-loss
 extensionPoint: true

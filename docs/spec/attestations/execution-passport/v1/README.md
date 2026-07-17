@@ -42,9 +42,9 @@ Each subject is a strict ResourceDescriptor with only:
 - `name`;
 - `digest`, containing exactly one lowercase hexadecimal `sha256` value;
 - `mediaType`;
-- optional absolute `uri`, excluding the `file` scheme.
+- optional bounded stable `uri`: either HTTPS without user information, query, or fragment, or a URN without query or fragment.
 
-`content`, `downloadLocation`, annotations, local paths, extra digest algorithms, and any other extension are invalid in v1.
+`content`, `downloadLocation`, annotations, inline URI schemes, local paths, extra digest algorithms, and any other extension are invalid in v1. URI values are limited to 2,048 characters.
 
 ## Predicate
 
@@ -74,7 +74,7 @@ An execution-evidence entry contains exactly:
 - `disclosure: content-free`;
 - one strict ResourceDescriptor for a separately stored evidence artifact.
 
-The producer computes the descriptor digest before Passport creation. The AgenticStrata CLI reads the binding document, not the provider’s raw execution result. Inputs, outputs, prompts, response bodies, endpoints, raw errors, full plans, model content, and provider payloads are excluded. Evidence descriptors remain predicate support and do not add a fourth Statement subject.
+The producer computes the descriptor digest before Passport creation. The AgenticStrata CLI reads the binding document, not the provider’s full execution result, and the contract has no payload or `content` field. Descriptor metadata is not inherently non-sensitive: `producer`, resource name, media type, and an optional stable URI must come from a trusted producer and be redacted or pseudonymized when necessary. The URI may be omitted. Evidence descriptors remain predicate support and do not add a fourth Statement subject.
 
 ## Creation checks
 
@@ -82,12 +82,14 @@ A conforming builder fails closed unless:
 
 1. the bundle and report satisfy their JSON Schemas;
 2. the report seal and nested evaluator seal match their content;
-3. `report.runBundleDigest` equals the canonical bundle digest;
-4. `report.manifestDigest` equals the canonical bound manifest digest;
-5. the receipt chain is intact and every observed run identifier agrees;
-6. report run status agrees with the final receipt shape;
-7. `issuedAt` is a valid date-time no earlier than `report.generatedAt`;
-8. every descriptor and execution-evidence binding is strict and duplicate evidence digests are absent.
+3. report check identifiers are unique, their ordered list matches `rulesDigest`, and report status is derived from those checks;
+4. `report.runBundleDigest` equals the canonical bundle digest;
+5. `report.manifestDigest` equals the canonical bound manifest digest;
+6. the receipt chain is intact and every observed run identifier agrees;
+7. report run status agrees with the final receipt shape;
+8. `report.generatedAt` is no earlier than every included trace, usage, boundary, criterion, decision, attestation, or approval observation time;
+9. `issuedAt` is a valid date-time no earlier than `report.generatedAt`;
+10. every descriptor and execution-evidence binding is strict and duplicate evidence digests are absent.
 
 These checks establish internal consistency. Hashes alone do not authenticate a producer and cannot prevent wholesale replacement by an actor able to create a new self-consistent set.
 

@@ -48,7 +48,17 @@
     "ExternalUri": {
       "type": "string",
       "format": "uri",
-      "not": { "pattern": "^[Ff][Ii][Ll][Ee]:" }
+      "maxLength": 2048,
+      "oneOf": [
+        {
+          "description": "Stable HTTPS reference without credentials, query, or fragment.",
+          "pattern": "^https://[^/?#@]+(?:/[^?#]*)?$"
+        },
+        {
+          "description": "Bounded stable URN without query or fragment.",
+          "pattern": "^urn:[a-zA-Z0-9][a-zA-Z0-9-]{0,31}:[a-zA-Z0-9][a-zA-Z0-9._~:/%+-]*$"
+        }
+      ]
     },
     "ResourceDescriptor": {
       "type": "object",

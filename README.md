@@ -115,7 +115,7 @@ Read [Architecture](docs/architecture.md), [Contracts and conformance](docs/cont
 - Reports bind the evaluator name, package version, semantic revision, selected rule set, and effective profile configuration. The evaluator digest identifies the declared implementation revision; it is not a code signature.
 - An unsigned Execution Passport proves deterministic integrity and cross-artifact binding only. Authenticity requires an externally verified DSSE envelope or equivalent trusted channel, and consumers must make that requirement explicit so removing a signature cannot silently downgrade policy.
 - The OASF subject digest proves which opaque record was bound; it does not prove that the record is semantically valid OASF. Validate it before passport creation with the specification owner’s tooling.
-- Execution-placement evidence enters the predicate only as strict content-free descriptors. Raw inputs, outputs, prompts, response bodies, endpoints, errors, and full plans are outside the Passport contract.
+- Execution-placement evidence enters the predicate only as strict descriptors with no payload or `content` field. Descriptor metadata must come from a trusted producer and be redacted or pseudonymized when sensitive; its optional stable URI may be omitted. Full provider result objects are outside the Passport contract.
 - A safe fingerprint binds the declared canonical intent. It does not prove that an upstream intent normalizer chose the correct meaning.
 - Adapter documents are integration contracts, not bundled protocol SDKs or policy engines.
 - The current release is an alpha contract surface. Version consumers explicitly before production adoption.

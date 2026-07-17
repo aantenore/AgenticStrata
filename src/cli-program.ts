@@ -153,9 +153,9 @@ export function createCliProgram(): Command {
     .requiredOption("--report <file>", "sealed ConformanceReport bound to the RunBundle")
     .requiredOption("--oasf-record <file>", "opaque external OASF JSON record to bind by digest")
     .requiredOption("--oasf-media-type <type>", "media type declared by the OASF record owner")
-    .option("--bundle-uri <uri>", "external RunBundle URI; local file URIs are rejected")
-    .option("--report-uri <uri>", "external ConformanceReport URI; local file URIs are rejected")
-    .option("--oasf-uri <uri>", "external OASF record URI; local file URIs are rejected")
+    .option("--bundle-uri <uri>", "stable HTTPS or URN RunBundle reference")
+    .option("--report-uri <uri>", "stable HTTPS or URN ConformanceReport reference")
+    .option("--oasf-uri <uri>", "stable HTTPS or URN OASF record reference")
     .option(
       "--execution-evidence <file>",
       "content-free ExecutionEvidenceBinding file; repeat for multiple providers",

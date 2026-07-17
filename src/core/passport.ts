@@ -135,6 +135,22 @@ function requireBoundReport(bundle: RunBundle, report: ConformanceReport): void 
     throw new Error("The ConformanceReport evaluator seal does not match its content.");
   }
 
+  const checkIds = report.checks.map((check) => check.id);
+  if (new Set(checkIds).size !== checkIds.length) {
+    throw new Error("The ConformanceReport contains duplicate check identifiers.");
+  }
+  if (report.rulesDigest !== digestValue(checkIds)) {
+    throw new Error("The ConformanceReport rules digest does not match its ordered checks.");
+  }
+  const expectedStatus = report.checks.some((check) => check.status === "fail")
+    ? "fail"
+    : "pass";
+  if (report.status !== expectedStatus) {
+    throw new Error(
+      `The ConformanceReport status ${report.status} does not match ${expectedStatus}.`
+    );
+  }
+
   const bundleDigest = digestValue(bundle);
   if (report.runBundleDigest !== bundleDigest) {
     throw new Error("The ConformanceReport is not bound to the supplied RunBundle.");
@@ -146,6 +162,60 @@ function requireBoundReport(bundle: RunBundle, report: ConformanceReport): void 
   const replay = verifyTraceChain(bundle.traceEvents, evidenceIndex(bundle));
   if (!replay.valid) {
     throw new Error(`The RunBundle receipt chain is invalid: ${validationMessage(replay)}`);
+  }
+}
+
+interface ObservedTimestamp {
+  label: string;
+  value: string;
+}
+
+function observedTimestamps(bundle: RunBundle): ObservedTimestamp[] {
+  return [
+    { label: "budget usage", value: bundle.budgetUsage.observedAt },
+    ...bundle.traceEvents.map((event) => ({
+      label: `trace event ${event.eventId}`,
+      value: event.occurredAt
+    })),
+    ...bundle.runtimeBoundaries.map((boundary) => ({
+      label: `runtime boundary ${boundary.boundaryEvidenceId}`,
+      value: boundary.observedAt
+    })),
+    ...bundle.criterionResults.map((criterion) => ({
+      label: `criterion result ${criterion.resultId}`,
+      value: criterion.observedAt
+    })),
+    ...bundle.decisions.map((decision) => ({
+      label: `decision ${decision.decisionId}`,
+      value: decision.createdAt
+    })),
+    ...bundle.attestations.map((attestation) => ({
+      label: `artifact attestation ${attestation.attestationId}`,
+      value: attestation.createdAt
+    })),
+    ...bundle.approvals.map((approval) => ({
+      label: `approval ${approval.approvalId}`,
+      value: approval.issuedAt
+    }))
+  ];
+}
+
+function requireReportAfterObservedEvidence(
+  bundle: RunBundle,
+  report: ConformanceReport
+): void {
+  const reportMillis = Date.parse(report.generatedAt);
+  if (!Number.isFinite(reportMillis)) {
+    throw new Error("ConformanceReport generatedAt must be a valid date-time.");
+  }
+  for (const observed of observedTimestamps(bundle)) {
+    const observedMillis = Date.parse(observed.value);
+    if (!Number.isFinite(observedMillis)) {
+      throw new Error(`${observed.label} must have a valid observed date-time.`);
+    }
+    if (reportMillis < observedMillis) {
+      throw new Error(`The ConformanceReport cannot precede ${observed.label}.`);
+    }
   }
 }
 
@@ -164,6 +234,7 @@ export function createExecutionPassport(
   input: CreateExecutionPassportInput
 ): ExecutionPassport {
   requireBoundReport(input.bundle, input.report);
+  requireReportAfterObservedEvidence(input.bundle, input.report);
   requireOpaqueJsonRecord(input.oasfRecord);
 
   const runId = requireConsistentRunIdentity(input.bundle);
