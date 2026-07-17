@@ -5,7 +5,7 @@
 | Family | Contracts | Purpose |
 | --- | --- | --- |
 | Application | `ApplicationManifest` | Declares strata, planes, policies, capability set, and imported specifications. |
-| Meaning | `IntentEnvelope`, `OutcomeContract`, `CriterionResult` | Binds canonical meaning, constraints, requested outcomes, and evidence-backed criterion results. |
+| Meaning | `IntentEnvelope`, `OutcomeContract`, `CriterionResult` | Binds canonical meaning, constraints, requested outcomes, exact evidence requirements, and criterion results. |
 | Execution | `ExecutionEnvelope`, `BudgetUsage`, `RuntimeBoundaryEvidence` | Sets profile, SLA, partitions, limits, observed consumption, hosting, data boundary, and egress observations. |
 | Authority | `AuthorityGrant`, `ApprovalReceipt`, `DelegationEnvelope` | Makes authorization explicit, attenuated, time-bounded, and action-specific. |
 | Capability | `CapabilityContract` | Defines risk, effect, schemas, scopes, and side-effect lifecycle. |
@@ -13,7 +13,7 @@
 | Assessment | `ConformanceReport` | Records profile checks and evidence-backed pass/fail status. |
 | Integration | `AdapterMapping` | Describes protocol projection and explicit information loss. |
 
-All integrity-bearing records use deterministic SHA-256 digests over [RFC 8785 JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785.html) output. AgenticStrata uses the maintained `canonicalize` implementation referenced by the RFC and tests standard key-ordering and number vectors. Inputs must be I-JSON values. Digest verification proves that a record matches its bytes and references; issuer authenticity requires an external signature or trusted append-only store.
+All integrity-bearing records use deterministic SHA-256 digests over [RFC 8785 JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785.html) output. AgenticStrata uses the maintained `canonicalize` implementation referenced by the RFC and tests standard key-ordering and number vectors. Inputs must be I-JSON values; the file boundary rejects duplicate JSON member names before the parsed value can enter the contract runtime. Digest verification proves that a record matches its bytes and references; issuer authenticity requires an external signature or trusted append-only store.
 
 ## Mechanical invariants
 
@@ -23,7 +23,7 @@ The core profile checks:
 - exactly seven strata and three planes;
 - downward dependency direction;
 - complete semantic and operational fingerprint bindings;
-- one evidence-backed result for every acceptance criterion;
+- one evidence-backed result for every acceptance criterion, matched against predeclared capability, action-digest, and evidence-role requirements;
 - unique identifiers and cross-record lineage;
 - imported agent specifications by reference only;
 - artifact payload and attestation digests;
@@ -31,14 +31,15 @@ The core profile checks:
 - observed usage and authority budgets within the execution envelope;
 - child grants and delegations that attenuate every dimension and reach a non-service trust root;
 - authority issuance outside model compute;
-- prepared, authorized effects with a one-to-one action/idempotency binding followed by an action-bound attested verification or compensation;
+- prepared, authorized effects with a one-to-one action/idempotency binding followed by exactly one action-bound attested verification or compensation;
+- phase-specific artifact roles (`prepared-action`, `observed-result`, and `compensation-result`), with post-effect attestations causally linked to the exact commit so pre-effect evidence cannot prove a post-effect result;
 - one final terminal receipt, with run success kept separate from conformance success;
 - capability input and output contracts that compile as JSON Schema 2020-12;
 - summary-only decision evidence.
 
-`local-private` additionally requires receipt-linked runtime boundary evidence rather than declarations alone. Enterprise adds exact approval for high-risk commits and control flags. Regulated and distributed profiles add their respective boundary checks.
+`local-private` additionally requires runtime boundary evidence rather than declarations alone. Every supplied observation must cover the complete receipt window, be linked by the unique terminal receipt, and consistently attest local data, local model hosting, and no observed egress. A stale, partial, unlinked, or contradictory observation fails the profile even if another observation passes. Enterprise adds exact approval for high-risk commits and control flags. Regulated and distributed profiles add their respective boundary checks.
 
-Every report binds the run bundle, selected rule list, and effective merged profile configuration by digest. This makes the assessment reproducible and prevents a custom profile from silently downgrading a built-in name.
+Every report binds the run bundle, selected rule list, effective merged profile configuration, and evaluator identity by digest. Evaluator identity contains the package version plus an explicitly versioned conformance revision. This makes the assessment reproducible, prevents a custom profile from silently downgrading a built-in name, and exposes which evaluator semantics produced the result. The evaluator digest binds declared release metadata; authenticity and executable-byte attestation remain deployment concerns.
 
 ## Evidence, not file detection
 

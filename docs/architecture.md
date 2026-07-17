@@ -39,6 +39,7 @@ The `lint` command validates the complete set, canonical ordinal, unique declara
 - Profiles select composable rules from YAML configuration.
 - Built-in rules are a non-removable baseline; custom profile configuration is additive and its digest is recorded in every report.
 - Side effects use prepare, commit, verify, and—at higher risk—compensate.
+- Evidence-required acceptance criteria bind the planned capability, canonical action digest, and acceptable result role before execution; runtime evidence must match that immutable requirement.
 - Idempotency is enforced at the capability boundary.
 - The observed budget record is checked against the execution envelope rather than inferred from configuration alone.
 - Requested outcomes, per-criterion results, run status, and conformance status remain distinct.
