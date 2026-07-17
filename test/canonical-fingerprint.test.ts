@@ -51,6 +51,10 @@ describe("canonical contracts", () => {
     expect(() => canonicalize(Number.NaN)).toThrow("finite");
     expect(() => canonicalize({ value: undefined })).toThrow("does not support undefined");
     expect(() => canonicalize(Symbol("unsupported"))).toThrow("does not support symbol");
+    expect(() => canonicalize("\ud800")).toThrow("lone Unicode surrogates");
+    expect(() => canonicalize(new Date("2026-07-17T12:00:00.000Z"))).toThrow(
+      "only JSON objects and arrays"
+    );
   });
 
   it("seals and detects mutation", () => {
