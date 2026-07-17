@@ -105,6 +105,6 @@ Read [Architecture](docs/architecture.md), [Contracts and conformance](docs/cont
 npm run release:check
 ```
 
-The release gate runs strict lint and types, 39+ tests with coverage thresholds, build, repository hygiene, production audit, `publint`, and Are the Types Wrong.
+The release gate runs strict lint and types, 44 tests with coverage thresholds, build, repository hygiene, production audit, `publint`, and Are the Types Wrong.
 
 Apache-2.0 licensed. See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
