@@ -59,6 +59,7 @@ export function verifyTraceChain(events: TraceEvent[], knownEvidence?: Set<strin
   const issues: ValidationIssue[] = [];
   let previous: TraceEvent | undefined;
   let runId: string | undefined;
+  let previousTimestamp: number | undefined;
   const eventSequenceByReference = new Map(
     events.map((event) => [
       `urn:agentic-strata:event:${event.eventId}`,
@@ -82,6 +83,23 @@ export function verifyTraceChain(events: TraceEvent[], knownEvidence?: Set<strin
         code: "run-id",
         message: "Every receipt in a chain must bind the same run."
       });
+    }
+    const timestamp = Date.parse(event.occurredAt);
+    if (!Number.isFinite(timestamp)) {
+      issues.push({
+        path: `/traceEvents/${index}/occurredAt`,
+        code: "timestamp",
+        message: "Receipt time must be a valid date-time."
+      });
+    } else if (previousTimestamp !== undefined && timestamp < previousTimestamp) {
+      issues.push({
+        path: `/traceEvents/${index}/occurredAt`,
+        code: "time-order",
+        message: "Receipt time cannot move backwards within one chain."
+      });
+    }
+    if (Number.isFinite(timestamp)) {
+      previousTimestamp = timestamp;
     }
     const expectedPrevious = previous?.digest ?? null;
     if (event.previousDigest !== expectedPrevious) {

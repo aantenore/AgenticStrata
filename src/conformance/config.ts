@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { parse } from "yaml";
@@ -19,6 +19,7 @@ export interface ProfileConfiguration {
 export const defaultProfileConfigPath = fileURLToPath(
   new URL("../../config/conformance.profiles.yaml", import.meta.url)
 );
+export const MAX_PROFILE_CONFIGURATION_BYTES = 1024 * 1024;
 
 function isProfile(value: unknown): value is ConformanceProfile {
   return (
@@ -28,6 +29,10 @@ function isProfile(value: unknown): value is ConformanceProfile {
 }
 
 export function loadProfileConfiguration(path = defaultProfileConfigPath): ProfileConfiguration {
+  const metadata = statSync(path);
+  if (!metadata.isFile() || metadata.size > MAX_PROFILE_CONFIGURATION_BYTES) {
+    throw new Error("Conformance profile configuration must be a bounded regular file.");
+  }
   const raw = parse(readFileSync(path, "utf8")) as unknown;
   if (raw === null || typeof raw !== "object") {
     throw new Error("Conformance profile configuration must be an object.");

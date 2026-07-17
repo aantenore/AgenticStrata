@@ -26,7 +26,7 @@ The core profile checks:
 - unique identifiers and cross-record lineage;
 - imported agent specifications by reference only;
 - artifact payload and attestation digests;
-- gap-free receipt replay and resolvable evidence;
+- gap-free, chronological receipt replay with backward-only resolvable evidence;
 - observed usage and authority budgets within the execution envelope;
 - child grants and delegations that attenuate every dimension;
 - authority issuance outside model compute;

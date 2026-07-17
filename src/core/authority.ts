@@ -9,7 +9,14 @@ import type {
 const budgetKeys = ["maxSteps", "maxDurationMs", "maxCostMicros", "maxTokens"] as const;
 
 export function budgetIsAttenuated(child: Budget, parent: Budget): boolean {
-  return budgetKeys.every((key) => child[key] <= parent[key]);
+  return budgetKeys.every(
+    (key) =>
+      Number.isFinite(child[key]) &&
+      Number.isFinite(parent[key]) &&
+      child[key] >= 0 &&
+      parent[key] >= 0 &&
+      child[key] <= parent[key]
+  );
 }
 
 function isSubset(child: string[], parent: string[]): boolean {
@@ -50,7 +57,13 @@ export function validateDelegation(
   const childEnd = Date.parse(delegation.expiresAt);
   const parentStart = Date.parse(parent.validFrom);
   const parentEnd = Date.parse(parent.expiresAt);
-  if (childStart < parentStart || childEnd > parentEnd || childEnd <= childStart) {
+  if (
+    ![childStart, childEnd, parentStart, parentEnd].every(Number.isFinite) ||
+    childStart < parentStart ||
+    childEnd > parentEnd ||
+    childEnd <= childStart ||
+    parentEnd <= parentStart
+  ) {
     add("/delegation/expiresAt", "ttl-attenuation", "Delegation validity must stay inside the parent validity window.");
   }
 
@@ -94,7 +107,13 @@ export function validateChildGrant(
   const childEnd = Date.parse(child.expiresAt);
   const parentStart = Date.parse(parent.validFrom);
   const parentEnd = Date.parse(parent.expiresAt);
-  if (childStart < parentStart || childEnd > parentEnd || childEnd <= childStart) {
+  if (
+    ![childStart, childEnd, parentStart, parentEnd].every(Number.isFinite) ||
+    childStart < parentStart ||
+    childEnd > parentEnd ||
+    childEnd <= childStart ||
+    parentEnd <= parentStart
+  ) {
     add(
       "/authorityGrant/expiresAt",
       "ttl-attenuation",

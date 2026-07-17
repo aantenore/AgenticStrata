@@ -35,6 +35,15 @@ describe("authority attenuation", () => {
     expect(validateDelegation({ ...delegation, ...change }, parent).valid).toBe(false);
   });
 
+  it("rejects invalid numeric budgets and time windows even before schema validation", () => {
+    expect(
+      budgetIsAttenuated({ ...delegation.budget, maxSteps: Number.NaN }, parent.budget)
+    ).toBe(false);
+    expect(validateDelegation({ ...delegation, validFrom: "not-a-time" }, parent).valid).toBe(
+      false
+    );
+  });
+
   it("validates an issued child grant and rejects a model-like issuer", () => {
     const child: AuthorityGrant = seal({
       contractType: "AuthorityGrant",
@@ -113,5 +122,18 @@ describe("runtime receipt replay", () => {
     };
     const result = verifyTraceChain(events, evidenceIndex(bundle));
     expect(result.issues.map((issue) => issue.code)).toContain("future-evidence");
+  });
+
+  it("rejects invalid and backwards receipt time", () => {
+    const events: TraceEvent[] = structuredClone(bundle.traceEvents);
+    const second = events[1];
+    const third = events[2];
+    if (second === undefined || third === undefined) throw new Error("demo events missing");
+    events[1] = { ...second, occurredAt: "2020-01-01T00:00:00.000Z" };
+    events[2] = { ...third, occurredAt: "not-a-time" };
+    const codes = verifyTraceChain(events).issues.map((issue) => issue.code);
+    expect(codes).toContain("timestamp");
+    expect(codes).toContain("time-order");
+    expect(codes).toContain("tamper-detected");
   });
 });
