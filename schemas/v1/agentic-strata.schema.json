@@ -20,6 +20,7 @@
     { "$ref": "#/$defs/ArtifactAttestation" },
     { "$ref": "#/$defs/TraceEvent" },
     { "$ref": "#/$defs/ConformanceReport" },
+    { "$ref": "#/$defs/ExecutionPassport" },
     { "$ref": "#/$defs/AdapterMapping" },
     { "$ref": "#/$defs/RunBundle" }
   ],
@@ -31,6 +32,45 @@
     "Digest": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
+    },
+    "Sha256DigestSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sha256": { "$ref": "#/$defs/Digest" }
+      },
+      "required": ["sha256"]
+    },
+    "MediaType": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9!#$&^_.+~-]*/[a-z0-9][a-z0-9!#$&^_.+~-]*$"
+    },
+    "ExternalUri": {
+      "type": "string",
+      "format": "uri",
+      "not": { "pattern": "^[Ff][Ii][Ll][Ee]:" }
+    },
+    "ResourceDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/Identifier" },
+        "digest": { "$ref": "#/$defs/Sha256DigestSet" },
+        "mediaType": { "$ref": "#/$defs/MediaType" },
+        "uri": { "$ref": "#/$defs/ExternalUri" }
+      },
+      "required": ["name", "digest", "mediaType"]
+    },
+    "ExecutionEvidenceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "role": { "type": "string", "const": "execution-placement" },
+        "producer": { "$ref": "#/$defs/Identifier" },
+        "resource": { "$ref": "#/$defs/ResourceDescriptor" },
+        "disclosure": { "type": "string", "const": "content-free" }
+      },
+      "required": ["role", "producer", "resource", "disclosure"]
     },
     "Identifier": {
       "type": "string",
@@ -1043,6 +1083,112 @@
         "digest"
       ]
     },
+    "RunBundleResourceDescriptor": {
+      "allOf": [
+        { "$ref": "#/$defs/ResourceDescriptor" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "const": "agentic-strata-run-bundle" },
+            "mediaType": {
+              "type": "string",
+              "const": "application/vnd.aantenore.agenticstrata.run-bundle+json"
+            }
+          }
+        }
+      ]
+    },
+    "ConformanceReportResourceDescriptor": {
+      "allOf": [
+        { "$ref": "#/$defs/ResourceDescriptor" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "const": "agentic-strata-conformance-report" },
+            "mediaType": {
+              "type": "string",
+              "const": "application/vnd.aantenore.agenticstrata.conformance-report+json"
+            }
+          }
+        }
+      ]
+    },
+    "OasfRecordResourceDescriptor": {
+      "allOf": [
+        { "$ref": "#/$defs/ResourceDescriptor" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "const": "oasf-agent-record" }
+          }
+        }
+      ]
+    },
+    "ExecutionPassportPredicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "kind": { "type": "string", "const": "ExecutionPassport" },
+        "runId": { "$ref": "#/$defs/Identifier" },
+        "profile": {
+          "type": "string",
+          "enum": ["core", "local-private", "enterprise", "regulated", "distributed"]
+        },
+        "runStatus": {
+          "type": "string",
+          "enum": ["completed", "failed", "incomplete"]
+        },
+        "conformanceStatus": { "type": "string", "enum": ["pass", "fail"] },
+        "evaluatorDigest": { "$ref": "#/$defs/Digest" },
+        "terminalReceiptDigest": {
+          "oneOf": [{ "$ref": "#/$defs/Digest" }, { "type": "null" }]
+        },
+        "issuedAt": { "type": "string", "format": "date-time" },
+        "executionEvidence": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/ExecutionEvidenceBinding" }
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "runId",
+        "profile",
+        "runStatus",
+        "conformanceStatus",
+        "evaluatorDigest",
+        "terminalReceiptDigest",
+        "issuedAt",
+        "executionEvidence"
+      ]
+    },
+    "ExecutionPassport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_type": { "type": "string", "const": "https://in-toto.io/Statement/v1" },
+        "subject": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "prefixItems": [
+            { "$ref": "#/$defs/RunBundleResourceDescriptor" },
+            { "$ref": "#/$defs/ConformanceReportResourceDescriptor" },
+            { "$ref": "#/$defs/OasfRecordResourceDescriptor" }
+          ],
+          "items": false
+        },
+        "predicateType": {
+          "type": "string",
+          "const": "https://github.com/aantenore/AgenticStrata/tree/main/docs/spec/attestations/execution-passport/v1"
+        },
+        "predicate": { "$ref": "#/$defs/ExecutionPassportPredicate" }
+      },
+      "required": ["_type", "subject", "predicateType", "predicate"]
+    },
     "AdapterMapping": {
       "type": "object",
       "additionalProperties": false,
@@ -1052,7 +1198,16 @@
         "mappingId": { "$ref": "#/$defs/Identifier" },
         "protocol": {
           "type": "string",
-          "enum": ["ag-ui", "a2a", "mcp", "opentelemetry-genai", "cloudevents", "policy-engine"]
+          "enum": [
+            "ag-ui",
+            "a2a",
+            "mcp",
+            "opentelemetry-genai",
+            "cloudevents",
+            "policy-engine",
+            "oasf",
+            "stagefabric"
+          ]
         },
         "protocolVersion": { "type": "string", "minLength": 1 },
         "direction": { "type": "string", "enum": ["inbound", "outbound", "bidirectional"] },

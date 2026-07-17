@@ -44,6 +44,11 @@ export function writeJson(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+export function writeCanonicalJson(path: string, value: unknown): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, canonicalize(value), "utf8");
+}
+
 export function writeText(path: string, value: string): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, value.endsWith("\n") ? value : `${value}\n`, "utf8");

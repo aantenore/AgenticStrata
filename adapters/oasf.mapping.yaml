@@ -1,0 +1,12 @@
+contractType: AdapterMapping
+apiVersion: agenticstrata.dev/v1
+mappingId: adapter/oasf
+protocol: oasf
+protocolVersion: externally-validated
+direction: inbound
+contractBindings:
+  - strataContract: ExecutionPassport
+    protocolObject: OASF agent record ResourceDescriptor
+    notes: The external record remains opaque; only its canonical digest, media type, and optional external URI enter the ordered subject tuple.
+lossPolicy: explicit-loss
+extensionPoint: true

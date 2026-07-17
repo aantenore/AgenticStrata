@@ -7,6 +7,7 @@ export * from "./core/authority.js";
 export * from "./core/canonical.js";
 export * from "./core/explain.js";
 export * from "./core/fingerprint.js";
+export * from "./core/passport.js";
 export * from "./core/receipts.js";
 export * from "./demo/demo.js";
 export * from "./demo/mock-change.js";

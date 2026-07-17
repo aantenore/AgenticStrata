@@ -5,11 +5,14 @@ import { Ajv2020, type ErrorObject, type ValidateFunction } from "ajv/dist/2020.
 import addFormatsImport from "ajv-formats";
 import type { FormatsPlugin } from "ajv-formats";
 
-import type {
-  CapabilityContract,
-  ContractType,
-  ValidationIssue,
-  ValidationResult
+import {
+  EXECUTION_PASSPORT_PREDICATE_TYPE,
+  IN_TOTO_STATEMENT_V1_TYPE,
+  type CapabilityContract,
+  type ContractType,
+  type SchemaDefinition,
+  type ValidationIssue,
+  type ValidationResult
 } from "./types.js";
 
 const schemaPath = fileURLToPath(
@@ -30,14 +33,14 @@ ajv.addSchema(schema, schemaId);
 
 const validators = new Map<string, ValidateFunction>();
 
-function validatorFor(contractType: ContractType): ValidateFunction {
-  const cached = validators.get(contractType);
+function validatorFor(schemaDefinition: SchemaDefinition): ValidateFunction {
+  const cached = validators.get(schemaDefinition);
   if (cached !== undefined) {
     return cached;
   }
 
-  const validator = ajv.compile({ $ref: `${schemaId}#/$defs/${contractType}` });
-  validators.set(contractType, validator);
+  const validator = ajv.compile({ $ref: `${schemaId}#/$defs/${schemaDefinition}` });
+  validators.set(schemaDefinition, validator);
   return validator;
 }
 
@@ -49,8 +52,11 @@ function toIssues(errors: ErrorObject[] | null | undefined): ValidationIssue[] {
   }));
 }
 
-export function validateAs(contractType: ContractType, document: unknown): ValidationResult {
-  const validator = validatorFor(contractType);
+export function validateAs(
+  schemaDefinition: SchemaDefinition,
+  document: unknown
+): ValidationResult {
+  const validator = validatorFor(schemaDefinition);
   const valid = validator(document);
   return { valid, issues: valid ? [] : toIssues(validator.errors) };
 }
@@ -63,7 +69,40 @@ export function validateDocument(document: unknown): ValidationResult {
     };
   }
 
-  const contractType = (document as { contractType?: unknown }).contractType;
+  const candidate = document as {
+    _type?: unknown;
+    predicateType?: unknown;
+    contractType?: unknown;
+  };
+  if ("_type" in candidate || "predicateType" in candidate) {
+    if (candidate._type !== IN_TOTO_STATEMENT_V1_TYPE) {
+      return {
+        valid: false,
+        issues: [
+          {
+            path: "/_type",
+            code: "const",
+            message: "The in-toto Statement type is missing or unsupported."
+          }
+        ]
+      };
+    }
+    if (candidate.predicateType !== EXECUTION_PASSPORT_PREDICATE_TYPE) {
+      return {
+        valid: false,
+        issues: [
+          {
+            path: "/predicateType",
+            code: "const",
+            message: "The in-toto predicate type is missing or unsupported."
+          }
+        ]
+      };
+    }
+    return validateAs("ExecutionPassport", document);
+  }
+
+  const contractType = candidate.contractType;
   if (typeof contractType !== "string" || !contractTypes.has(contractType as ContractType)) {
     return {
       valid: false,

@@ -1,0 +1,15 @@
+contractType: AdapterMapping
+apiVersion: agenticstrata.dev/v1
+mappingId: adapter/stagefabric
+protocol: stagefabric
+protocolVersion: configurable
+direction: inbound
+contractBindings:
+  - strataContract: ExecutionEvidenceBinding
+    protocolObject: ExecutionPlacementEvidence ResourceDescriptor
+    notes: Only role, producer, disclosure mode, resource name, canonical digest, media type, and optional external URI are admitted.
+  - strataContract: ExecutionPassport
+    protocolObject: predicate executionEvidence entry
+    notes: Inputs, outputs, prompts, response bodies, endpoints, raw errors, full plans, and provider payloads are explicitly excluded.
+lossPolicy: explicit-loss
+extensionPoint: true

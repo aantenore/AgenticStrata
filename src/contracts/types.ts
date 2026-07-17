@@ -3,6 +3,19 @@ export const EVALUATOR_NAME = "agentic-strata" as const;
 export const EVALUATOR_VERSION = "0.1.0-alpha.1" as const;
 export const EVALUATOR_REVISION = "conformance-2026-07-17.3" as const;
 
+export const IN_TOTO_STATEMENT_V1_TYPE = "https://in-toto.io/Statement/v1" as const;
+export const EXECUTION_PASSPORT_PREDICATE_TYPE =
+  "https://github.com/aantenore/AgenticStrata/tree/main/docs/spec/attestations/execution-passport/v1" as const;
+export const EXECUTION_PASSPORT_SUBJECTS = {
+  runBundle: "agentic-strata-run-bundle",
+  conformanceReport: "agentic-strata-conformance-report",
+  oasfRecord: "oasf-agent-record"
+} as const;
+export const EXECUTION_PASSPORT_MEDIA_TYPES = {
+  runBundle: "application/vnd.aantenore.agenticstrata.run-bundle+json",
+  conformanceReport: "application/vnd.aantenore.agenticstrata.conformance-report+json"
+} as const;
+
 export const STRATA = [
   "interaction",
   "intent-outcome",
@@ -376,11 +389,73 @@ export interface ConformanceReport {
   digest: Digest;
 }
 
+export interface ResourceDescriptor {
+  name: string;
+  digest: {
+    sha256: Digest;
+  };
+  mediaType: string;
+  uri?: string;
+}
+
+export interface RunBundleResourceDescriptor extends ResourceDescriptor {
+  name: typeof EXECUTION_PASSPORT_SUBJECTS.runBundle;
+  mediaType: typeof EXECUTION_PASSPORT_MEDIA_TYPES.runBundle;
+}
+
+export interface ConformanceReportResourceDescriptor extends ResourceDescriptor {
+  name: typeof EXECUTION_PASSPORT_SUBJECTS.conformanceReport;
+  mediaType: typeof EXECUTION_PASSPORT_MEDIA_TYPES.conformanceReport;
+}
+
+export interface OasfRecordResourceDescriptor extends ResourceDescriptor {
+  name: typeof EXECUTION_PASSPORT_SUBJECTS.oasfRecord;
+}
+
+export interface ExecutionEvidenceBinding {
+  role: "execution-placement";
+  producer: string;
+  resource: ResourceDescriptor;
+  disclosure: "content-free";
+}
+
+export interface ExecutionPassportPredicate {
+  apiVersion: ApiVersion;
+  kind: "ExecutionPassport";
+  runId: string;
+  profile: ConformanceProfile;
+  runStatus: ConformanceReport["runStatus"];
+  conformanceStatus: ConformanceReport["status"];
+  evaluatorDigest: Digest;
+  terminalReceiptDigest: Digest | null;
+  issuedAt: string;
+  executionEvidence: ExecutionEvidenceBinding[];
+}
+
+export interface ExecutionPassport {
+  _type: typeof IN_TOTO_STATEMENT_V1_TYPE;
+  subject: [
+    RunBundleResourceDescriptor,
+    ConformanceReportResourceDescriptor,
+    OasfRecordResourceDescriptor
+  ];
+  predicateType: typeof EXECUTION_PASSPORT_PREDICATE_TYPE;
+  predicate: ExecutionPassportPredicate;
+}
+
 export interface AdapterMapping {
   contractType: "AdapterMapping";
   apiVersion: ApiVersion;
   mappingId: string;
-  protocol: "ag-ui" | "a2a" | "mcp" | "opentelemetry-genai" | "cloudevents" | "policy-engine";
+  protocol:
+    | "ag-ui"
+    | "a2a"
+    | "mcp"
+    | "opentelemetry-genai"
+    | "cloudevents"
+    | "policy-engine"
+    | "oasf"
+    | "stagefabric";
   protocolVersion: string;
   direction: "inbound" | "outbound" | "bidirectional";
   contractBindings: Array<{
@@ -431,6 +506,12 @@ export type ContractType =
   | ConformanceReport["contractType"]
   | AdapterMapping["contractType"]
   | RunBundle["contractType"];
+
+export type SchemaDefinition =
+  | ContractType
+  | "ResourceDescriptor"
+  | "ExecutionEvidenceBinding"
+  | "ExecutionPassport";
 
 export interface ValidationIssue {
   path: string;

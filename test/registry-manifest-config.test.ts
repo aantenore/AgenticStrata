@@ -1,15 +1,18 @@
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { readDocument } from "../src/adapters/documents.js";
 import {
+  createExecutionPassport,
   defaultProfileConfigPath,
   getSchemaPath,
   lintManifest,
   loadProfileConfiguration,
   resolveProfileRules,
+  runConformance,
   validateAs,
   validateDocument
 } from "../src/index.js";
@@ -38,6 +41,36 @@ describe("language-neutral contract registry", () => {
     const result = validateAs("ExecutionEnvelope", invalid);
     expect(result.valid).toBe(false);
     expect(result.issues.some((issue) => issue.path === "/profile")).toBe(true);
+  });
+
+  it("dispatches the supported in-toto predicate without a contractType", () => {
+    const bundle = runDemo().bundle;
+    const report = runConformance(bundle, "enterprise", {
+      generatedAt: "2026-07-17T12:00:00.000Z"
+    });
+    const passport = createExecutionPassport({
+      bundle,
+      report,
+      oasfRecord: { opaqueExternalRecord: true },
+      oasfMediaType: "application/json",
+      issuedAt: "2026-07-17T12:00:01.000Z"
+    });
+    expect(validateDocument(passport)).toEqual({ valid: true, issues: [] });
+    expect(
+      validateDocument({ ...passport, predicateType: "https://example.test/unknown" })
+        .issues[0]
+    ).toMatchObject({ path: "/predicateType", code: "const" });
+    expect(validateDocument({ ...passport, _type: "https://example.test/unknown" }).issues[0])
+      .toMatchObject({ path: "/_type", code: "const" });
+  });
+
+  it("validates the OASF and placement-provider loss mappings", () => {
+    for (const path of ["adapters/oasf.mapping.yaml", "adapters/stagefabric.mapping.yaml"]) {
+      expect(validateAs("AdapterMapping", readDocument(resolve(path)))).toEqual({
+        valid: true,
+        issues: []
+      });
+    }
   });
 });
 

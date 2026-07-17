@@ -35,11 +35,12 @@ try {
   );
 
   const probe = [
-    'import { runConformance, runDemo } from "agentic-strata";',
+    'import { createExecutionPassport, runConformance, runDemo, validateDocument } from "agentic-strata";',
     'const result = runDemo();',
     'const report = runConformance(result.bundle, "enterprise");',
-    'if (report.status !== "pass" || report.runStatus !== "completed" || result.readBack !== true) process.exit(2);',
-    'console.log(JSON.stringify({ status: report.status, runStatus: report.runStatus, readBack: result.readBack }));'
+    'const passport = createExecutionPassport({ bundle: result.bundle, report, oasfRecord: { opaqueExternalRecord: true }, oasfMediaType: "application/json" });',
+    'if (report.status !== "pass" || report.runStatus !== "completed" || result.readBack !== true || !validateDocument(passport).valid || passport.subject.length !== 3) process.exit(2);',
+    'console.log(JSON.stringify({ status: report.status, runStatus: report.runStatus, readBack: result.readBack, passport: "pass" }));'
   ].join("\n");
   const output = run(process.execPath, ["--input-type=module", "--eval", probe], temporary);
   process.stdout.write(output);
@@ -57,7 +58,31 @@ try {
   const cliOutput = join(temporary, "cli-demo");
   run(executable, ["demo", "--output", cliOutput, "--profile", "enterprise"], temporary);
   run(executable, ["validate", join(cliOutput, "run.bundle.json")], temporary);
-  console.log(JSON.stringify({ cliVersion: version, cliDemo: "pass" }));
+  const oasfRecord = join(temporary, "external-oasf.json");
+  const passportOutput = join(temporary, "execution-passport.json");
+  writeFileSync(oasfRecord, '{"opaqueExternalRecord":true}\n', "utf8");
+  run(
+    executable,
+    [
+      "passport",
+      join(cliOutput, "run.bundle.json"),
+      "--report",
+      join(cliOutput, "conformance-report.json"),
+      "--oasf-record",
+      oasfRecord,
+      "--oasf-media-type",
+      "application/json",
+      "--issued-at",
+      "2026-07-17T12:00:01.000Z",
+      "--output",
+      passportOutput
+    ],
+    temporary
+  );
+  run(executable, ["validate", passportOutput], temporary);
+  console.log(
+    JSON.stringify({ cliVersion: version, cliDemo: "pass", cliPassport: "pass" })
+  );
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }
