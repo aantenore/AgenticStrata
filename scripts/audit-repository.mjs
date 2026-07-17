@@ -9,6 +9,7 @@ const blockedFragments = [
   ["aantenore", "re", "ply"].join(""),
   ["no", "re", "ply"].join("")
 ];
+const configuredHistoryRef = process.env.AGENTIC_STRATA_AUDIT_HISTORY_REF?.trim() ?? "";
 
 function git(args, options = {}) {
   return execFileSync("git", args, {
@@ -46,10 +47,21 @@ try {
 }
 
 if (hasHistory) {
+  const historyRevision = configuredHistoryRef === "" ? ["--all"] : [configuredHistoryRef];
+  if (configuredHistoryRef !== "") {
+    if (!/^[a-f0-9]{40,64}$/i.test(configuredHistoryRef)) {
+      throw new Error("Configured audit history ref must be a full commit object id.");
+    }
+    try {
+      git(["cat-file", "-e", `${configuredHistoryRef}^{commit}`]);
+    } catch {
+      throw new Error("Configured audit history ref is not an available commit.");
+    }
+  }
   const metadata = git([
     "log",
     "--format=%H%x00%an%x00%ae%x00%cn%x00%ce%x00%s",
-    "--all"
+    ...historyRevision
   ]);
   assertClean("reachable commit metadata", metadata);
   for (const row of metadata.split("\n").filter(Boolean)) {
@@ -79,7 +91,7 @@ if (hasHistory) {
     }
   }
 
-  const reachableObjects = git(["rev-list", "--objects", "--all"])
+  const reachableObjects = git(["rev-list", "--objects", ...historyRevision])
     .split("\n")
     .filter(Boolean);
   const visited = new Set();
@@ -110,6 +122,7 @@ console.log(
     {
       filesScanned: files.length,
       historyScanned: hasHistory,
+      historyScope: configuredHistoryRef === "" ? "all refs" : configuredHistoryRef,
       historyBlobsScanned: hasHistory ? "all reachable text blobs up to 16 MiB" : "none",
       canonicalIdentity: `${canonicalName} <${canonicalEmail}>`
     },

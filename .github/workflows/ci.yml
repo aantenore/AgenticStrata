@@ -39,7 +39,13 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - run: npm run check
+      - name: Run quality and publishable-history audit
+        run: npm run check
+        env:
+          # pull_request checks run on a synthetic GitHub merge commit. Audit the
+          # real publishable head history while all build/test steps still run
+          # against the synthetic merge result.
+          AGENTIC_STRATA_AUDIT_HISTORY_REF: ${{ github.event.pull_request.head.sha || '' }}
       - run: npm run demo
       - run: node dist/cli.js validate examples/application.manifest.yaml
       - run: node dist/cli.js conformance examples/generic-change/run.bundle.json --profile enterprise
