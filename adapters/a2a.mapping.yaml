@@ -1,0 +1,18 @@
+contractType: AdapterMapping
+apiVersion: agenticstrata.dev/v1
+mappingId: adapter/a2a
+protocol: a2a
+protocolVersion: configurable
+direction: bidirectional
+contractBindings:
+  - strataContract: DelegationEnvelope
+    protocolObject: task and message metadata
+    notes: Authority scope, expiry, and budget remain signed application contracts.
+  - strataContract: ArtifactAttestation
+    protocolObject: artifact metadata
+    notes: The artifact payload and its digest are validated before admission.
+  - strataContract: TraceEvent
+    protocolObject: task status update
+    notes: External task states are projected into the canonical receipt chain.
+lossPolicy: explicit-loss
+extensionPoint: true

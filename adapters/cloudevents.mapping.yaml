@@ -1,0 +1,18 @@
+contractType: AdapterMapping
+apiVersion: agenticstrata.dev/v1
+mappingId: adapter/cloudevents
+protocol: cloudevents
+protocolVersion: configurable
+direction: bidirectional
+contractBindings:
+  - strataContract: TraceEvent
+    protocolObject: CloudEvent data
+    notes: Event id, source, type, time, and data map to the canonical runtime receipt.
+  - strataContract: ArtifactAttestation
+    protocolObject: data reference and digest extensions
+    notes: Payload transfer never removes provenance or integrity bindings.
+  - strataContract: ExecutionEnvelope
+    protocolObject: correlation and partition extensions
+    notes: Run, tenant, privacy, and budget bindings survive asynchronous transport.
+lossPolicy: explicit-loss
+extensionPoint: true

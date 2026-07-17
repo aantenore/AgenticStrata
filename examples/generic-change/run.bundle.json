@@ -1,0 +1,627 @@
+{
+  "contractType": "RunBundle",
+  "apiVersion": "agenticstrata.dev/v1",
+  "manifest": {
+    "contractType": "ApplicationManifest",
+    "apiVersion": "agenticstrata.dev/v1",
+    "metadata": {
+      "name": "generic-enterprise-change",
+      "version": "1.0.0",
+      "description": "A neutral, approval-gated enterprise change application."
+    },
+    "architecture": {
+      "deploymentMode": "modular-monolith",
+      "strata": [
+        {
+          "id": "interaction",
+          "ordinal": 0,
+          "moduleRef": "modules/interaction",
+          "dependsOn": [
+            "intent-outcome"
+          ]
+        },
+        {
+          "id": "intent-outcome",
+          "ordinal": 1,
+          "moduleRef": "modules/intent-outcome",
+          "dependsOn": [
+            "control-orchestration"
+          ]
+        },
+        {
+          "id": "control-orchestration",
+          "ordinal": 2,
+          "moduleRef": "modules/control-orchestration",
+          "dependsOn": [
+            "collaboration"
+          ]
+        },
+        {
+          "id": "collaboration",
+          "ordinal": 3,
+          "moduleRef": "modules/collaboration",
+          "dependsOn": [
+            "capability"
+          ]
+        },
+        {
+          "id": "capability",
+          "ordinal": 4,
+          "moduleRef": "modules/capability",
+          "dependsOn": [
+            "knowledge-state"
+          ]
+        },
+        {
+          "id": "knowledge-state",
+          "ordinal": 5,
+          "moduleRef": "modules/knowledge-state",
+          "dependsOn": [
+            "model-compute"
+          ]
+        },
+        {
+          "id": "model-compute",
+          "ordinal": 6,
+          "moduleRef": "modules/model-compute",
+          "dependsOn": []
+        }
+      ],
+      "planes": [
+        "trust-authority",
+        "evidence-operations",
+        "lifecycle-conformance"
+      ],
+      "externalAgentSpecifications": []
+    },
+    "policies": {
+      "policyBundleDigest": "db387ff210c86e1242c9df93bf97e1c347ec6a5662e55f0c3d9797a6080bf6ab",
+      "authorityEnforcedOutsideModel": true,
+      "approvalRequiredForHighRisk": true,
+      "artifactAttestationRequired": true,
+      "receiptChainRequired": true,
+      "retentionDays": 365,
+      "defaultDataBoundary": "tenant",
+      "allowedModelHosting": [
+        "local",
+        "private-cloud",
+        "managed"
+      ]
+    },
+    "capabilitySetDigest": "0598363469f966ed19ed63739ee0a13540b2450f13dbf2ea5e1bb477350f9713",
+    "conformanceProfiles": [
+      "core",
+      "enterprise"
+    ]
+  },
+  "intent": {
+    "contractType": "IntentEnvelope",
+    "apiVersion": "agenticstrata.dev/v1",
+    "intentId": "intent-change-001",
+    "canonicalIntent": "set configuration sample-feature enabled to true",
+    "constraints": {
+      "expectedRevision": 7,
+      "requiresReadBack": true
+    },
+    "ambiguity": 0.02,
+    "confidence": 0.98,
+    "context": [
+      {
+        "ref": "state://workspace/sample-feature/revision-7",
+        "digest": "d3ad6c6c48f382d957020903242852731a70595875a22ee7acbb00b983c84585",
+        "trust": "authoritative"
+      },
+      {
+        "ref": "message://external/suggestion",
+        "digest": "9377b0b30d92fce75b657c76e5969b70d4ec422108fe29aab6747ced84850af0",
+        "trust": "untrusted"
+      }
+    ],
+    "fingerprint": {
+      "algorithm": "sha256",
+      "specVersion": "agenticstrata.dev/v1",
+      "semantic": {
+        "algorithm": "sha256",
+        "specVersion": "agenticstrata.dev/v1",
+        "canonicalIntentDigest": "0e2cab3cfd76053cc48904b6d6067b6ccd22d6e5721e243b9d980597196d12e5",
+        "digest": "6015683d035440b4be360f68a7c652c8bad10675ed9ede19badcc0a65fe66153"
+      },
+      "operational": {
+        "algorithm": "sha256",
+        "specVersion": "agenticstrata.dev/v1",
+        "constraintsDigest": "8ca6cbe3200c64d126aa1072520253129f457cd8e26ad69c8dbb6f04b866f7a2",
+        "authoritativeContextDigests": [
+          "d3ad6c6c48f382d957020903242852731a70595875a22ee7acbb00b983c84585"
+        ],
+        "outcomeDigest": "ba7883f15ebf0be1364e22cd0a66ba8c4689bc34fbc75d6e3f85404126873bf1",
+        "policyBundleDigest": "db387ff210c86e1242c9df93bf97e1c347ec6a5662e55f0c3d9797a6080bf6ab",
+        "capabilitySetDigest": "0598363469f966ed19ed63739ee0a13540b2450f13dbf2ea5e1bb477350f9713",
+        "tenantPartitionDigest": "25df65715893abae2a9be1be21813a8e905f032e90c67d68839916f8f40d8455",
+        "privacyPartition": "tenant",
+        "digest": "8e10ad6f2419f5638134786a46fbd21a9e4d10cc2f0665a600c370aa6c7b46a1"
+      },
+      "cacheKey": "e6734c300824900b68321161ed2183afc720c99f18e98e48cb3a1a065dac443d",
+      "digest": "c1eb7b6afb27b5e1be994902e184f3b6e135b0a9428e3ae3bf78b5392cb90204"
+    }
+  },
+  "outcome": {
+    "contractType": "OutcomeContract",
+    "apiVersion": "agenticstrata.dev/v1",
+    "outcomeId": "outcome-change-001",
+    "objective": "Apply one approved configuration change and prove the observed result.",
+    "acceptanceCriteria": [
+      {
+        "id": "criterion-value",
+        "assertion": "Read-back equals the approved target value.",
+        "evidenceRequired": true
+      },
+      {
+        "id": "criterion-once",
+        "assertion": "The action is committed at most once.",
+        "evidenceRequired": true
+      }
+    ],
+    "forbiddenOutcomes": [
+      "Commit without external authority",
+      "Treat untrusted context as authority"
+    ],
+    "digest": "ba7883f15ebf0be1364e22cd0a66ba8c4689bc34fbc75d6e3f85404126873bf1"
+  },
+  "execution": {
+    "contractType": "ExecutionEnvelope",
+    "apiVersion": "agenticstrata.dev/v1",
+    "runId": "run-change-demo-001",
+    "intentId": "intent-change-001",
+    "outcomeId": "outcome-change-001",
+    "profile": "balanced",
+    "budget": {
+      "maxSteps": 12,
+      "maxDurationMs": 30000,
+      "maxCostMicros": 100000,
+      "maxTokens": 16000
+    },
+    "sla": {
+      "deadline": "2026-07-17T12:05:00.000Z",
+      "availabilityClass": "standard"
+    },
+    "tenantPartitionDigest": "25df65715893abae2a9be1be21813a8e905f032e90c67d68839916f8f40d8455",
+    "privacyPartition": "tenant"
+  },
+  "budgetUsage": {
+    "contractType": "BudgetUsage",
+    "apiVersion": "agenticstrata.dev/v1",
+    "runId": "run-change-demo-001",
+    "steps": 3,
+    "durationMs": 25,
+    "costMicros": 0,
+    "tokens": 0,
+    "observedAt": "2026-07-17T12:00:00.000Z",
+    "digest": "daf69db31e4a92d87b39e9e3adf091b6413d312b1815551c2db910546762d07b"
+  },
+  "authorityGrants": [
+    {
+      "contractType": "AuthorityGrant",
+      "apiVersion": "agenticstrata.dev/v1",
+      "grantId": "grant-change-001",
+      "issuer": {
+        "type": "human",
+        "id": "principal-change-owner"
+      },
+      "subject": "agent-change-coordinator",
+      "scopes": [
+        "change:prepare",
+        "change:commit",
+        "change:verify",
+        "change:compensate"
+      ],
+      "resourcePatterns": [
+        "configuration://workspace/sample-feature"
+      ],
+      "budget": {
+        "maxSteps": 10,
+        "maxDurationMs": 20000,
+        "maxCostMicros": 80000,
+        "maxTokens": 12000
+      },
+      "validFrom": "2026-07-17T11:55:00.000Z",
+      "expiresAt": "2026-07-17T12:10:00.000Z",
+      "digest": "d61181d731112cf3348dbd43a51ea7c9e17b50e910ea6f6f200c07b98bb91395"
+    }
+  ],
+  "approvals": [
+    {
+      "contractType": "ApprovalReceipt",
+      "apiVersion": "agenticstrata.dev/v1",
+      "approvalId": "approval-change-001",
+      "actionDigest": "a3a0e1199d50d0b501f13ab1a39cd765d9123420aefab497920b237c7b50c63c",
+      "authorityGrantId": "grant-change-001",
+      "decision": "approved",
+      "approvedBy": {
+        "type": "human",
+        "id": "principal-change-owner"
+      },
+      "scope": "generic-change",
+      "issuedAt": "2026-07-17T11:59:30.000Z",
+      "expiresAt": "2026-07-17T12:04:00.000Z",
+      "digest": "f33d0f70df7d9d177dbc95f513619ddad1a94bcbcb50a19d000bcc23d7d8012d"
+    }
+  ],
+  "delegations": [
+    {
+      "contractType": "DelegationEnvelope",
+      "apiVersion": "agenticstrata.dev/v1",
+      "delegationId": "delegation-verify-001",
+      "parentGrantId": "grant-change-001",
+      "delegator": "agent-change-coordinator",
+      "delegate": "agent-change-verifier",
+      "scopes": [
+        "change:verify"
+      ],
+      "resourcePatterns": [
+        "configuration://workspace/sample-feature"
+      ],
+      "budget": {
+        "maxSteps": 2,
+        "maxDurationMs": 5000,
+        "maxCostMicros": 10000,
+        "maxTokens": 2000
+      },
+      "validFrom": "2026-07-17T11:59:00.000Z",
+      "expiresAt": "2026-07-17T12:05:00.000Z",
+      "digest": "18776dea5f05416f375d6b83efd94f04454d24345ea8671f9b0dbefb48636eba"
+    }
+  ],
+  "capabilities": [
+    {
+      "contractType": "CapabilityContract",
+      "apiVersion": "agenticstrata.dev/v1",
+      "capabilityId": "generic-change",
+      "version": "1.0.0",
+      "description": "Prepare, commit, verify, and compensate a typed configuration change.",
+      "riskClass": "high",
+      "effectClass": "write",
+      "operations": [
+        "prepare",
+        "commit",
+        "verify",
+        "compensate"
+      ],
+      "authorityScopes": [
+        "change:commit"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "resource",
+          "key",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": [
+          "actionDigest",
+          "committedAt"
+        ],
+        "additionalProperties": true
+      },
+      "sideEffectPolicy": {
+        "idempotencyRequired": true,
+        "verificationRequired": true,
+        "compensationRequired": true
+      },
+      "digest": "42b0df6c4be1b153e825f0ed1051642c87177986c6ffbd7d2714f54683fca98d"
+    }
+  ],
+  "decisions": [
+    {
+      "contractType": "DecisionEvidence",
+      "apiVersion": "agenticstrata.dev/v1",
+      "decisionId": "decision-path-001",
+      "decisionType": "execution",
+      "summary": "Selected the approval-gated prepare/commit/verify path for a high-risk write.",
+      "selectedOption": "prepare-commit-verify",
+      "rejectedOptions": [
+        {
+          "option": "direct-write",
+          "reason": "The capability risk contract requires preparation and approval."
+        }
+      ],
+      "evidenceRefs": [
+        "urn:agentic-strata:authority:grant-change-001"
+      ],
+      "confidence": 1,
+      "reasoningDisclosure": "summary-only",
+      "createdAt": "2026-07-17T12:00:00.000Z",
+      "digest": "009c407476805b9177e4937d7a23723d75723ff4df041deb68ddabab56be7344"
+    }
+  ],
+  "artifacts": [
+    {
+      "contractType": "RuntimeArtifact",
+      "apiVersion": "agenticstrata.dev/v1",
+      "artifactRef": "artifact://change/prepared-001",
+      "mediaType": "application/json",
+      "payload": {
+        "resource": "configuration://workspace/sample-feature",
+        "key": "enabled",
+        "before": false,
+        "after": true,
+        "actionDigest": "a3a0e1199d50d0b501f13ab1a39cd765d9123420aefab497920b237c7b50c63c"
+      },
+      "digest": "fecac26cfb44052046628f858679467caed3099c1664a56a1c73642cc3c5c2a1"
+    },
+    {
+      "contractType": "RuntimeArtifact",
+      "apiVersion": "agenticstrata.dev/v1",
+      "artifactRef": "artifact://change/result-001",
+      "mediaType": "application/json",
+      "payload": {
+        "receipt": {
+          "actionDigest": "a3a0e1199d50d0b501f13ab1a39cd765d9123420aefab497920b237c7b50c63c",
+          "idempotencyKey": "idempotency-change-001",
+          "before": false,
+          "after": true,
+          "committedAt": "2026-07-17T12:00:00.000Z",
+          "duplicate": false
+        },
+        "readBack": true
+      },
+      "digest": "6f6cca710c22500bc38f69ab97e51cc2a42e47cb7668ca3060ccbfec25d6bd49"
+    }
+  ],
+  "attestations": [
+    {
+      "contractType": "ArtifactAttestation",
+      "apiVersion": "agenticstrata.dev/v1",
+      "attestationId": "attestation-prepared-001",
+      "artifactRef": "artifact://change/prepared-001",
+      "artifactDigest": "fecac26cfb44052046628f858679467caed3099c1664a56a1c73642cc3c5c2a1",
+      "producer": "capability-generic-change",
+      "createdAt": "2026-07-17T12:00:00.000Z",
+      "provenanceRefs": [
+        "urn:agentic-strata:authority:grant-change-001"
+      ],
+      "digest": "f089420e710dc9cf2f3fd2914b8f74a6b2646909db8f0b53a2770bcc6cf36439"
+    },
+    {
+      "contractType": "ArtifactAttestation",
+      "apiVersion": "agenticstrata.dev/v1",
+      "attestationId": "attestation-result-001",
+      "artifactRef": "artifact://change/result-001",
+      "artifactDigest": "6f6cca710c22500bc38f69ab97e51cc2a42e47cb7668ca3060ccbfec25d6bd49",
+      "producer": "capability-generic-change",
+      "createdAt": "2026-07-17T12:00:00.000Z",
+      "provenanceRefs": [
+        "urn:agentic-strata:authority:grant-change-001",
+        "urn:agentic-strata:approval:approval-change-001"
+      ],
+      "digest": "69b1a322fa97f95127b7c526b09bd1874917b3501bbefa36c057cff6df11ba2e"
+    }
+  ],
+  "traceEvents": [
+    {
+      "contractType": "TraceEvent",
+      "apiVersion": "agenticstrata.dev/v1",
+      "runId": "run-change-demo-001",
+      "occurredAt": "2026-07-17T12:00:00.000Z",
+      "attributes": {
+        "nodeId": "local-demo"
+      },
+      "eventId": "event-intent-accepted",
+      "sequence": 0,
+      "eventType": "intent.accepted",
+      "stratum": "intent-outcome",
+      "summary": "Canonical intent accepted with explicit ambiguity and confidence.",
+      "evidenceRefs": [],
+      "previousDigest": null,
+      "digest": "a872fbe70ffc19ff70d7fab1764e4671b75d0e6762dd8bf502a5ad927ec77a4b"
+    },
+    {
+      "contractType": "TraceEvent",
+      "apiVersion": "agenticstrata.dev/v1",
+      "runId": "run-change-demo-001",
+      "occurredAt": "2026-07-17T12:00:00.000Z",
+      "attributes": {
+        "nodeId": "local-demo"
+      },
+      "eventId": "event-outcome-bound",
+      "sequence": 1,
+      "eventType": "outcome.bound",
+      "stratum": "intent-outcome",
+      "summary": "Outcome and acceptance evidence requirements bound to the run.",
+      "evidenceRefs": [],
+      "previousDigest": "a872fbe70ffc19ff70d7fab1764e4671b75d0e6762dd8bf502a5ad927ec77a4b",
+      "digest": "d774228a81a3e5f97c357631faa187c318eca29f5bbfc61d239e5c1d6f9381d5"
+    },
+    {
+      "contractType": "TraceEvent",
+      "apiVersion": "agenticstrata.dev/v1",
+      "runId": "run-change-demo-001",
+      "occurredAt": "2026-07-17T12:00:00.000Z",
+      "attributes": {
+        "nodeId": "local-demo"
+      },
+      "eventId": "event-decision-recorded",
+      "sequence": 2,
+      "eventType": "decision.recorded",
+      "stratum": "control-orchestration",
+      "summary": "Selected the approval-gated prepare/commit/verify path for a high-risk write.",
+      "evidenceRefs": [
+        "urn:agentic-strata:decision:decision-path-001"
+      ],
+      "previousDigest": "d774228a81a3e5f97c357631faa187c318eca29f5bbfc61d239e5c1d6f9381d5",
+      "digest": "0b7b9a83a3ed749699d4c047186d700203c926a8bb841704e6a4ec85b3c2b72d"
+    },
+    {
+      "contractType": "TraceEvent",
+      "apiVersion": "agenticstrata.dev/v1",
+      "runId": "run-change-demo-001",
+      "occurredAt": "2026-07-17T12:00:00.000Z",
+      "attributes": {
+        "nodeId": "local-demo"
+      },
+      "eventId": "event-authority-checked",
+      "sequence": 3,
+      "eventType": "authority.checked",
+      "stratum": "control-orchestration",
+      "summary": "External authority grant matched actor, scope, resource, time, and budget.",
+      "evidenceRefs": [
+        "urn:agentic-strata:authority:grant-change-001"
+      ],
+      "previousDigest": "0b7b9a83a3ed749699d4c047186d700203c926a8bb841704e6a4ec85b3c2b72d",
+      "digest": "89509f51847798b94e8c4aa72bfaaf157a1ef6dde707b5d00c50a9e7a2384140"
+    },
+    {
+      "contractType": "TraceEvent",
+      "apiVersion": "agenticstrata.dev/v1",
+      "runId": "run-change-demo-001",
+      "occurredAt": "2026-07-17T12:00:00.000Z",
+      "attributes": {
+        "nodeId": "local-demo"
+      },
+      "eventId": "event-approval-recorded",
+      "sequence": 4,
+      "eventType": "approval.recorded",
+      "stratum": "control-orchestration",
+      "summary": "Approval receipt matched the exact prepared action digest.",
+      "evidenceRefs": [
+        "urn:agentic-strata:authority:grant-change-001",
+        "urn:agentic-strata:approval:approval-change-001"
+      ],
+      "previousDigest": "89509f51847798b94e8c4aa72bfaaf157a1ef6dde707b5d00c50a9e7a2384140",
+      "digest": "6be62ffcabe7de649d5a82497e7b68615f4e740166e13fd80976efbd0ed7f563"
+    },
+    {
+      "contractType": "TraceEvent",
+      "apiVersion": "agenticstrata.dev/v1",
+      "runId": "run-change-demo-001",
+      "occurredAt": "2026-07-17T12:00:00.000Z",
+      "attributes": {
+        "nodeId": "local-demo"
+      },
+      "eventId": "event-delegation-created",
+      "sequence": 5,
+      "eventType": "delegation.created",
+      "stratum": "collaboration",
+      "summary": "Verification authority was delegated with narrower scope, time, and budget.",
+      "evidenceRefs": [
+        "urn:agentic-strata:authority:grant-change-001"
+      ],
+      "previousDigest": "6be62ffcabe7de649d5a82497e7b68615f4e740166e13fd80976efbd0ed7f563",
+      "digest": "c4ea78c4922456c15622ddc8c97571fb8576c725ec9c1abe6b849b0a7d176ce6"
+    },
+    {
+      "contractType": "TraceEvent",
+      "apiVersion": "agenticstrata.dev/v1",
+      "runId": "run-change-demo-001",
+      "occurredAt": "2026-07-17T12:00:00.000Z",
+      "attributes": {
+        "nodeId": "local-demo",
+        "capabilityId": "generic-change",
+        "actionDigest": "a3a0e1199d50d0b501f13ab1a39cd765d9123420aefab497920b237c7b50c63c"
+      },
+      "eventId": "event-capability-prepared",
+      "sequence": 6,
+      "eventType": "capability.prepared",
+      "stratum": "capability",
+      "summary": "Change prepared without applying a side effect.",
+      "evidenceRefs": [
+        "urn:agentic-strata:artifact:attestation-prepared-001"
+      ],
+      "previousDigest": "c4ea78c4922456c15622ddc8c97571fb8576c725ec9c1abe6b849b0a7d176ce6",
+      "digest": "5ac67a08bb04ed3bb64424170aeee802cb178b15db3904b98e81f653331d5466"
+    },
+    {
+      "contractType": "TraceEvent",
+      "apiVersion": "agenticstrata.dev/v1",
+      "runId": "run-change-demo-001",
+      "occurredAt": "2026-07-17T12:00:00.000Z",
+      "attributes": {
+        "nodeId": "local-demo",
+        "capabilityId": "generic-change",
+        "actionDigest": "a3a0e1199d50d0b501f13ab1a39cd765d9123420aefab497920b237c7b50c63c",
+        "authorityGrantId": "grant-change-001",
+        "approvalReceiptId": "approval-change-001",
+        "actorId": "agent-change-coordinator",
+        "resource": "configuration://workspace/sample-feature",
+        "idempotencyKey": "idempotency-change-001"
+      },
+      "eventId": "event-capability-committed",
+      "sequence": 7,
+      "eventType": "capability.committed",
+      "stratum": "capability",
+      "summary": "Approved change committed once through the typed capability boundary.",
+      "evidenceRefs": [
+        "urn:agentic-strata:authority:grant-change-001",
+        "urn:agentic-strata:approval:approval-change-001",
+        "urn:agentic-strata:artifact:attestation-prepared-001"
+      ],
+      "previousDigest": "5ac67a08bb04ed3bb64424170aeee802cb178b15db3904b98e81f653331d5466",
+      "digest": "7fab8edf5430bdbef62ccb9603f71c3887e5586721d8733d761702e17e2d61fc"
+    },
+    {
+      "contractType": "TraceEvent",
+      "apiVersion": "agenticstrata.dev/v1",
+      "runId": "run-change-demo-001",
+      "occurredAt": "2026-07-17T12:00:00.000Z",
+      "attributes": {
+        "nodeId": "local-demo",
+        "capabilityId": "generic-change",
+        "actionDigest": "a3a0e1199d50d0b501f13ab1a39cd765d9123420aefab497920b237c7b50c63c",
+        "verificationId": "verification-readback-001",
+        "verified": true
+      },
+      "eventId": "event-capability-verified",
+      "sequence": 8,
+      "eventType": "capability.verified",
+      "stratum": "knowledge-state",
+      "summary": "Independent read-back matched the approved target value.",
+      "evidenceRefs": [
+        "urn:agentic-strata:artifact:attestation-result-001"
+      ],
+      "previousDigest": "7fab8edf5430bdbef62ccb9603f71c3887e5586721d8733d761702e17e2d61fc",
+      "digest": "60079a1c24b9a6e960151aa36bf286e5ac72fd9c1eabd686b5f2df4d84aaf9a4"
+    },
+    {
+      "contractType": "TraceEvent",
+      "apiVersion": "agenticstrata.dev/v1",
+      "runId": "run-change-demo-001",
+      "occurredAt": "2026-07-17T12:00:00.000Z",
+      "attributes": {
+        "nodeId": "local-demo"
+      },
+      "eventId": "event-artifact-attested",
+      "sequence": 9,
+      "eventType": "artifact.attested",
+      "stratum": "knowledge-state",
+      "summary": "Prepared and observed runtime artifacts were attested by digest.",
+      "evidenceRefs": [
+        "urn:agentic-strata:artifact:attestation-prepared-001",
+        "urn:agentic-strata:artifact:attestation-result-001"
+      ],
+      "previousDigest": "60079a1c24b9a6e960151aa36bf286e5ac72fd9c1eabd686b5f2df4d84aaf9a4",
+      "digest": "146a5fea278a8926e6b917623793de5521a9307dfdc97d1642dc7381e2b733fc"
+    },
+    {
+      "contractType": "TraceEvent",
+      "apiVersion": "agenticstrata.dev/v1",
+      "runId": "run-change-demo-001",
+      "occurredAt": "2026-07-17T12:00:00.000Z",
+      "attributes": {
+        "nodeId": "local-demo"
+      },
+      "eventId": "event-run-completed",
+      "sequence": 10,
+      "eventType": "run.completed",
+      "stratum": "interaction",
+      "summary": "Outcome criteria passed with verified runtime evidence.",
+      "evidenceRefs": [
+        "urn:agentic-strata:artifact:attestation-result-001"
+      ],
+      "previousDigest": "146a5fea278a8926e6b917623793de5521a9307dfdc97d1642dc7381e2b733fc",
+      "digest": "0fc6295a9709ebe11cfbdb67cb032b62782580c9d56dd65ab8f3c4315a0298dc"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+contractType: AdapterMapping
+apiVersion: agenticstrata.dev/v1
+mappingId: adapter/opentelemetry-genai
+protocol: opentelemetry-genai
+protocolVersion: configurable
+direction: outbound
+contractBindings:
+  - strataContract: TraceEvent
+    protocolObject: span event and semantic attributes
+    notes: Run, stratum, capability, latency, and status are projected without private model reasoning.
+  - strataContract: DecisionEvidence
+    protocolObject: decision event
+    notes: Summary and evidence references are emitted; internal reasoning is excluded.
+  - strataContract: ConformanceReport
+    protocolObject: conformance span and metrics
+    notes: Profile status and failed check identifiers are observable.
+lossPolicy: explicit-loss
+extensionPoint: true

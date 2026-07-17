@@ -1,0 +1,7 @@
+[
+  {
+    "op": "replace",
+    "path": "/traceEvents/7/summary",
+    "value": "An altered summary whose stored digest was not recomputed."
+  }
+]

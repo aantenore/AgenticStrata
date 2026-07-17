@@ -1,0 +1,87 @@
+{
+  "name": "agentic-strata",
+  "version": "0.1.0-alpha.1",
+  "description": "Executable, contract-first reference architecture for enterprise agentic applications.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "Antonio Antenore",
+    "email": "ant_ant95@hotmail.it"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aantenore/AgenticStrata.git"
+  },
+  "homepage": "https://github.com/aantenore/AgenticStrata#readme",
+  "bugs": {
+    "url": "https://github.com/aantenore/AgenticStrata/issues"
+  },
+  "keywords": [
+    "agentic-ai",
+    "ai-agents",
+    "enterprise-architecture",
+    "conformance",
+    "governance",
+    "json-schema",
+    "receipts"
+  ],
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "agentic-strata": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "schemas",
+    "config",
+    "adapters",
+    "examples",
+    "docs",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "audit:production": "npm audit --omit=dev",
+    "audit:repository": "node scripts/audit-repository.mjs",
+    "check": "npm run lint && npm run typecheck && npm run test:coverage && npm run build && npm run audit:repository",
+    "demo": "npm run build && node dist/cli.js demo --output .tmp/demo",
+    "pack:check": "npm pack --dry-run && publint --strict && attw --pack . --profile esm-only",
+    "package:smoke": "node scripts/package-smoke.mjs",
+    "release:check": "npm run check && npm run audit:production && npm run pack:check && npm run package:smoke",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "commander": "^14.0.0",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.31.0",
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@types/node": "^22.17.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^9.31.0",
+    "globals": "^16.3.0",
+    "publint": "^0.3.21",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.38.0",
+    "vitest": "^3.2.4"
+  }
+}

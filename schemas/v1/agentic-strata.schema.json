@@ -1,0 +1,873 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenticstrata.dev/schemas/v1/agentic-strata.schema.json",
+  "title": "AgenticStrata contract bundle",
+  "description": "Language-neutral contracts for a layered enterprise agentic application.",
+  "oneOf": [
+    { "$ref": "#/$defs/ApplicationManifest" },
+    { "$ref": "#/$defs/IntentEnvelope" },
+    { "$ref": "#/$defs/OutcomeContract" },
+    { "$ref": "#/$defs/ExecutionEnvelope" },
+    { "$ref": "#/$defs/BudgetUsage" },
+    { "$ref": "#/$defs/AuthorityGrant" },
+    { "$ref": "#/$defs/ApprovalReceipt" },
+    { "$ref": "#/$defs/DelegationEnvelope" },
+    { "$ref": "#/$defs/CapabilityContract" },
+    { "$ref": "#/$defs/DecisionEvidence" },
+    { "$ref": "#/$defs/RuntimeArtifact" },
+    { "$ref": "#/$defs/ArtifactAttestation" },
+    { "$ref": "#/$defs/TraceEvent" },
+    { "$ref": "#/$defs/ConformanceReport" },
+    { "$ref": "#/$defs/AdapterMapping" },
+    { "$ref": "#/$defs/RunBundle" }
+  ],
+  "$defs": {
+    "ApiVersion": {
+      "type": "string",
+      "const": "agenticstrata.dev/v1"
+    },
+    "Digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "Identifier": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]{1,127}$"
+    },
+    "StringMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "null"]
+      }
+    },
+    "Budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxSteps": { "type": "integer", "minimum": 1 },
+        "maxDurationMs": { "type": "integer", "minimum": 1 },
+        "maxCostMicros": { "type": "integer", "minimum": 0 },
+        "maxTokens": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["maxSteps", "maxDurationMs", "maxCostMicros", "maxTokens"]
+    },
+    "BudgetUsage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "BudgetUsage" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "runId": { "$ref": "#/$defs/Identifier" },
+        "steps": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "costMicros": { "type": "integer", "minimum": 0 },
+        "tokens": { "type": "integer", "minimum": 0 },
+        "observedAt": { "type": "string", "format": "date-time" },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "runId",
+        "steps",
+        "durationMs",
+        "costMicros",
+        "tokens",
+        "observedAt",
+        "digest"
+      ]
+    },
+    "EvidenceReference": {
+      "type": "string",
+      "pattern": "^urn:agentic-strata:(artifact|approval|authority|decision|event):[a-zA-Z0-9._:-]+$"
+    },
+    "SemanticFingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": { "type": "string", "const": "sha256" },
+        "specVersion": { "$ref": "#/$defs/ApiVersion" },
+        "canonicalIntentDigest": { "$ref": "#/$defs/Digest" },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": ["algorithm", "specVersion", "canonicalIntentDigest", "digest"]
+    },
+    "OperationalFingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": { "type": "string", "const": "sha256" },
+        "specVersion": { "$ref": "#/$defs/ApiVersion" },
+        "constraintsDigest": { "$ref": "#/$defs/Digest" },
+        "authoritativeContextDigests": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Digest" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "outcomeDigest": { "$ref": "#/$defs/Digest" },
+        "policyBundleDigest": { "$ref": "#/$defs/Digest" },
+        "capabilitySetDigest": { "$ref": "#/$defs/Digest" },
+        "tenantPartitionDigest": { "$ref": "#/$defs/Digest" },
+        "privacyPartition": {
+          "type": "string",
+          "enum": ["public", "tenant", "private", "restricted"]
+        },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": [
+        "algorithm",
+        "specVersion",
+        "constraintsDigest",
+        "authoritativeContextDigests",
+        "outcomeDigest",
+        "policyBundleDigest",
+        "capabilitySetDigest",
+        "tenantPartitionDigest",
+        "privacyPartition",
+        "digest"
+      ]
+    },
+    "CompositeFingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": { "type": "string", "const": "sha256" },
+        "specVersion": { "$ref": "#/$defs/ApiVersion" },
+        "semantic": { "$ref": "#/$defs/SemanticFingerprint" },
+        "operational": { "$ref": "#/$defs/OperationalFingerprint" },
+        "cacheKey": { "$ref": "#/$defs/Digest" },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": ["algorithm", "specVersion", "semantic", "operational", "cacheKey", "digest"]
+    },
+    "ApplicationManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "ApplicationManifest" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "$ref": "#/$defs/Identifier" },
+            "version": { "type": "string", "minLength": 1 },
+            "description": { "type": "string", "minLength": 1 }
+          },
+          "required": ["name", "version", "description"]
+        },
+        "architecture": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "deploymentMode": {
+              "type": "string",
+              "enum": ["single-process", "modular-monolith", "distributed"]
+            },
+            "strata": {
+              "type": "array",
+              "minItems": 7,
+              "maxItems": 7,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "enum": [
+                      "interaction",
+                      "intent-outcome",
+                      "control-orchestration",
+                      "collaboration",
+                      "capability",
+                      "knowledge-state",
+                      "model-compute"
+                    ]
+                  },
+                  "ordinal": { "type": "integer", "minimum": 0, "maximum": 6 },
+                  "moduleRef": { "type": "string", "minLength": 1 },
+                  "dependsOn": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "uniqueItems": true
+                  }
+                },
+                "required": ["id", "ordinal", "moduleRef", "dependsOn"]
+              }
+            },
+            "planes": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "enum": ["trust-authority", "evidence-operations", "lifecycle-conformance"]
+              }
+            },
+            "externalAgentSpecifications": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "ref": { "type": "string", "minLength": 1 },
+                  "digest": { "$ref": "#/$defs/Digest" },
+                  "mediaType": { "type": "string", "minLength": 1 }
+                },
+                "required": ["ref", "digest", "mediaType"]
+              }
+            }
+          },
+          "required": ["deploymentMode", "strata", "planes", "externalAgentSpecifications"]
+        },
+        "policies": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policyBundleDigest": { "$ref": "#/$defs/Digest" },
+            "authorityEnforcedOutsideModel": { "type": "boolean", "const": true },
+            "approvalRequiredForHighRisk": { "type": "boolean" },
+            "artifactAttestationRequired": { "type": "boolean" },
+            "receiptChainRequired": { "type": "boolean" },
+            "retentionDays": { "type": "integer", "minimum": 0 },
+            "defaultDataBoundary": {
+              "type": "string",
+              "enum": ["local", "tenant", "regional", "global"]
+            },
+            "allowedModelHosting": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "enum": ["local", "private-cloud", "managed"] }
+            }
+          },
+          "required": [
+            "policyBundleDigest",
+            "authorityEnforcedOutsideModel",
+            "approvalRequiredForHighRisk",
+            "artifactAttestationRequired",
+            "receiptChainRequired",
+            "retentionDays",
+            "defaultDataBoundary",
+            "allowedModelHosting"
+          ]
+        },
+        "capabilitySetDigest": { "$ref": "#/$defs/Digest" },
+        "conformanceProfiles": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["core", "local-private", "enterprise", "regulated", "distributed"]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "metadata",
+        "architecture",
+        "policies",
+        "capabilitySetDigest",
+        "conformanceProfiles"
+      ]
+    },
+    "IntentEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "IntentEnvelope" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "intentId": { "$ref": "#/$defs/Identifier" },
+        "canonicalIntent": { "type": "string", "minLength": 1 },
+        "constraints": { "$ref": "#/$defs/StringMap" },
+        "ambiguity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "context": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "ref": { "type": "string", "minLength": 1 },
+              "digest": { "$ref": "#/$defs/Digest" },
+              "trust": { "type": "string", "enum": ["authoritative", "untrusted"] }
+            },
+            "required": ["ref", "digest", "trust"]
+          }
+        },
+        "fingerprint": { "$ref": "#/$defs/CompositeFingerprint" }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "intentId",
+        "canonicalIntent",
+        "constraints",
+        "ambiguity",
+        "confidence",
+        "context",
+        "fingerprint"
+      ]
+    },
+    "OutcomeContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "OutcomeContract" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "outcomeId": { "$ref": "#/$defs/Identifier" },
+        "objective": { "type": "string", "minLength": 1 },
+        "acceptanceCriteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": { "$ref": "#/$defs/Identifier" },
+              "assertion": { "type": "string", "minLength": 1 },
+              "evidenceRequired": { "type": "boolean" }
+            },
+            "required": ["id", "assertion", "evidenceRequired"]
+          }
+        },
+        "forbiddenOutcomes": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "outcomeId",
+        "objective",
+        "acceptanceCriteria",
+        "forbiddenOutcomes",
+        "digest"
+      ]
+    },
+    "ExecutionEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "ExecutionEnvelope" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "runId": { "$ref": "#/$defs/Identifier" },
+        "intentId": { "$ref": "#/$defs/Identifier" },
+        "outcomeId": { "$ref": "#/$defs/Identifier" },
+        "profile": {
+          "type": "string",
+          "enum": ["economy", "balanced", "quality", "latency", "privacy"]
+        },
+        "budget": { "$ref": "#/$defs/Budget" },
+        "sla": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "deadline": { "type": "string", "format": "date-time" },
+            "availabilityClass": { "type": "string", "enum": ["best-effort", "standard", "critical"] }
+          },
+          "required": ["deadline", "availabilityClass"]
+        },
+        "tenantPartitionDigest": { "$ref": "#/$defs/Digest" },
+        "privacyPartition": {
+          "type": "string",
+          "enum": ["public", "tenant", "private", "restricted"]
+        }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "runId",
+        "intentId",
+        "outcomeId",
+        "profile",
+        "budget",
+        "sla",
+        "tenantPartitionDigest",
+        "privacyPartition"
+      ]
+    },
+    "AuthorityGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "AuthorityGrant" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "grantId": { "$ref": "#/$defs/Identifier" },
+        "issuer": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["human", "identity-provider", "service-policy"] },
+            "id": { "$ref": "#/$defs/Identifier" }
+          },
+          "required": ["type", "id"]
+        },
+        "subject": { "$ref": "#/$defs/Identifier" },
+        "scopes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "resourcePatterns": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "budget": { "$ref": "#/$defs/Budget" },
+        "validFrom": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "parentGrantId": { "$ref": "#/$defs/Identifier" },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "grantId",
+        "issuer",
+        "subject",
+        "scopes",
+        "resourcePatterns",
+        "budget",
+        "validFrom",
+        "expiresAt",
+        "digest"
+      ]
+    },
+    "ApprovalReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "ApprovalReceipt" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "approvalId": { "$ref": "#/$defs/Identifier" },
+        "actionDigest": { "$ref": "#/$defs/Digest" },
+        "authorityGrantId": { "$ref": "#/$defs/Identifier" },
+        "decision": { "type": "string", "enum": ["approved", "rejected"] },
+        "approvedBy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["human", "policy-engine"] },
+            "id": { "$ref": "#/$defs/Identifier" }
+          },
+          "required": ["type", "id"]
+        },
+        "scope": { "type": "string", "minLength": 1 },
+        "issuedAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "approvalId",
+        "actionDigest",
+        "authorityGrantId",
+        "decision",
+        "approvedBy",
+        "scope",
+        "issuedAt",
+        "expiresAt",
+        "digest"
+      ]
+    },
+    "DelegationEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "DelegationEnvelope" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "delegationId": { "$ref": "#/$defs/Identifier" },
+        "parentGrantId": { "$ref": "#/$defs/Identifier" },
+        "delegator": { "$ref": "#/$defs/Identifier" },
+        "delegate": { "$ref": "#/$defs/Identifier" },
+        "scopes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "resourcePatterns": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "budget": { "$ref": "#/$defs/Budget" },
+        "validFrom": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "delegationId",
+        "parentGrantId",
+        "delegator",
+        "delegate",
+        "scopes",
+        "resourcePatterns",
+        "budget",
+        "validFrom",
+        "expiresAt",
+        "digest"
+      ]
+    },
+    "CapabilityContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "CapabilityContract" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "capabilityId": { "$ref": "#/$defs/Identifier" },
+        "version": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "riskClass": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "effectClass": { "type": "string", "enum": ["read", "draft", "write", "external", "destructive"] },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["prepare", "commit", "verify", "compensate"] }
+        },
+        "authorityScopes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "inputSchema": { "type": "object" },
+        "outputSchema": { "type": "object" },
+        "sideEffectPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "idempotencyRequired": { "type": "boolean" },
+            "verificationRequired": { "type": "boolean" },
+            "compensationRequired": { "type": "boolean" }
+          },
+          "required": ["idempotencyRequired", "verificationRequired", "compensationRequired"]
+        },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "capabilityId",
+        "version",
+        "description",
+        "riskClass",
+        "effectClass",
+        "operations",
+        "authorityScopes",
+        "inputSchema",
+        "outputSchema",
+        "sideEffectPolicy",
+        "digest"
+      ]
+    },
+    "DecisionEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "DecisionEvidence" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "decisionId": { "$ref": "#/$defs/Identifier" },
+        "decisionType": {
+          "type": "string",
+          "enum": ["intent", "planning", "routing", "delegation", "policy", "execution"]
+        },
+        "summary": { "type": "string", "minLength": 1 },
+        "selectedOption": { "type": "string", "minLength": 1 },
+        "rejectedOptions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "option": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 }
+            },
+            "required": ["option", "reason"]
+          }
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/EvidenceReference" },
+          "uniqueItems": true
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "reasoningDisclosure": { "type": "string", "const": "summary-only" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "decisionId",
+        "decisionType",
+        "summary",
+        "selectedOption",
+        "rejectedOptions",
+        "evidenceRefs",
+        "confidence",
+        "reasoningDisclosure",
+        "createdAt",
+        "digest"
+      ]
+    },
+    "ArtifactAttestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "ArtifactAttestation" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "attestationId": { "$ref": "#/$defs/Identifier" },
+        "artifactRef": { "type": "string", "minLength": 1 },
+        "artifactDigest": { "$ref": "#/$defs/Digest" },
+        "producer": { "$ref": "#/$defs/Identifier" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "provenanceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/EvidenceReference" },
+          "uniqueItems": true
+        },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "attestationId",
+        "artifactRef",
+        "artifactDigest",
+        "producer",
+        "createdAt",
+        "provenanceRefs",
+        "digest"
+      ]
+    },
+    "RuntimeArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "RuntimeArtifact" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "artifactRef": { "type": "string", "minLength": 1 },
+        "mediaType": { "type": "string", "minLength": 1 },
+        "payload": {},
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": ["contractType", "apiVersion", "artifactRef", "mediaType", "payload", "digest"]
+    },
+    "TraceEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "TraceEvent" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "eventId": { "$ref": "#/$defs/Identifier" },
+        "runId": { "$ref": "#/$defs/Identifier" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "eventType": {
+          "type": "string",
+          "enum": [
+            "intent.accepted",
+            "outcome.bound",
+            "authority.checked",
+            "approval.recorded",
+            "delegation.created",
+            "capability.prepared",
+            "capability.committed",
+            "capability.verified",
+            "capability.compensated",
+            "decision.recorded",
+            "artifact.attested",
+            "run.completed",
+            "run.failed"
+          ]
+        },
+        "stratum": {
+          "type": "string",
+          "enum": [
+            "interaction",
+            "intent-outcome",
+            "control-orchestration",
+            "collaboration",
+            "capability",
+            "knowledge-state",
+            "model-compute"
+          ]
+        },
+        "summary": { "type": "string", "minLength": 1 },
+        "attributes": { "$ref": "#/$defs/StringMap" },
+        "evidenceRefs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EvidenceReference" },
+          "uniqueItems": true
+        },
+        "occurredAt": { "type": "string", "format": "date-time" },
+        "previousDigest": {
+          "oneOf": [{ "$ref": "#/$defs/Digest" }, { "type": "null" }]
+        },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "eventId",
+        "runId",
+        "sequence",
+        "eventType",
+        "stratum",
+        "summary",
+        "attributes",
+        "evidenceRefs",
+        "occurredAt",
+        "previousDigest",
+        "digest"
+      ]
+    },
+    "ConformanceCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/Identifier" },
+        "status": { "type": "string", "enum": ["pass", "fail", "not-applicable"] },
+        "severity": { "type": "string", "enum": ["info", "warning", "error"] },
+        "message": { "type": "string", "minLength": 1 },
+        "evidenceRefs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EvidenceReference" },
+          "uniqueItems": true
+        }
+      },
+      "required": ["id", "status", "severity", "message", "evidenceRefs"]
+    },
+    "ConformanceReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "ConformanceReport" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "reportId": { "$ref": "#/$defs/Identifier" },
+        "profile": {
+          "type": "string",
+          "enum": ["core", "local-private", "enterprise", "regulated", "distributed"]
+        },
+        "status": { "type": "string", "enum": ["pass", "fail"] },
+        "manifestDigest": { "$ref": "#/$defs/Digest" },
+        "runBundleDigest": { "$ref": "#/$defs/Digest" },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ConformanceCheck" }
+        },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "reportId",
+        "profile",
+        "status",
+        "manifestDigest",
+        "runBundleDigest",
+        "generatedAt",
+        "checks",
+        "digest"
+      ]
+    },
+    "AdapterMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "AdapterMapping" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "mappingId": { "$ref": "#/$defs/Identifier" },
+        "protocol": {
+          "type": "string",
+          "enum": ["ag-ui", "a2a", "mcp", "opentelemetry-genai", "cloudevents", "policy-engine"]
+        },
+        "protocolVersion": { "type": "string", "minLength": 1 },
+        "direction": { "type": "string", "enum": ["inbound", "outbound", "bidirectional"] },
+        "contractBindings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "strataContract": { "type": "string", "minLength": 1 },
+              "protocolObject": { "type": "string", "minLength": 1 },
+              "notes": { "type": "string", "minLength": 1 }
+            },
+            "required": ["strataContract", "protocolObject", "notes"]
+          }
+        },
+        "lossPolicy": { "type": "string", "enum": ["lossless", "explicit-loss"] },
+        "extensionPoint": { "type": "boolean" }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "mappingId",
+        "protocol",
+        "protocolVersion",
+        "direction",
+        "contractBindings",
+        "lossPolicy",
+        "extensionPoint"
+      ]
+    },
+    "RunBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractType": { "type": "string", "const": "RunBundle" },
+        "apiVersion": { "$ref": "#/$defs/ApiVersion" },
+        "manifest": { "$ref": "#/$defs/ApplicationManifest" },
+        "intent": { "$ref": "#/$defs/IntentEnvelope" },
+        "outcome": { "$ref": "#/$defs/OutcomeContract" },
+        "execution": { "$ref": "#/$defs/ExecutionEnvelope" },
+        "budgetUsage": { "$ref": "#/$defs/BudgetUsage" },
+        "authorityGrants": { "type": "array", "items": { "$ref": "#/$defs/AuthorityGrant" } },
+        "approvals": { "type": "array", "items": { "$ref": "#/$defs/ApprovalReceipt" } },
+        "delegations": { "type": "array", "items": { "$ref": "#/$defs/DelegationEnvelope" } },
+        "capabilities": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/CapabilityContract" } },
+        "decisions": { "type": "array", "items": { "$ref": "#/$defs/DecisionEvidence" } },
+        "artifacts": { "type": "array", "items": { "$ref": "#/$defs/RuntimeArtifact" } },
+        "attestations": { "type": "array", "items": { "$ref": "#/$defs/ArtifactAttestation" } },
+        "traceEvents": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/TraceEvent" } }
+      },
+      "required": [
+        "contractType",
+        "apiVersion",
+        "manifest",
+        "intent",
+        "outcome",
+        "execution",
+        "budgetUsage",
+        "authorityGrants",
+        "approvals",
+        "delegations",
+        "capabilities",
+        "decisions",
+        "artifacts",
+        "attestations",
+        "traceEvents"
+      ]
+    }
+  }
+}

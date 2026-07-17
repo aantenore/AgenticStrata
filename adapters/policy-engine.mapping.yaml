@@ -1,0 +1,18 @@
+contractType: AdapterMapping
+apiVersion: agenticstrata.dev/v1
+mappingId: adapter/policy-engine
+protocol: policy-engine
+protocolVersion: configurable
+direction: bidirectional
+contractBindings:
+  - strataContract: AuthorityGrant
+    protocolObject: policy input subject, action, resource, and constraints
+    notes: A policy decision may issue bounded authority but a model cannot.
+  - strataContract: ApprovalReceipt
+    protocolObject: signed or attestable decision result
+    notes: Approval binds one exact action digest, scope, issuer, and expiry.
+  - strataContract: DelegationEnvelope
+    protocolObject: attenuation query
+    notes: Scope, resources, time, and budgets must all remain subsets.
+lossPolicy: lossless
+extensionPoint: true

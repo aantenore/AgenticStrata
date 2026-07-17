@@ -1,0 +1,53 @@
+contractType: ApplicationManifest
+apiVersion: agenticstrata.dev/v1
+metadata:
+  name: reference-enterprise-application
+  version: 1.0.0
+  description: Vendor-neutral layered agentic application manifest.
+architecture:
+  deploymentMode: modular-monolith
+  strata:
+    - id: interaction
+      ordinal: 0
+      moduleRef: modules/interaction
+      dependsOn: [intent-outcome]
+    - id: intent-outcome
+      ordinal: 1
+      moduleRef: modules/intent-outcome
+      dependsOn: [control-orchestration]
+    - id: control-orchestration
+      ordinal: 2
+      moduleRef: modules/control-orchestration
+      dependsOn: [collaboration]
+    - id: collaboration
+      ordinal: 3
+      moduleRef: modules/collaboration
+      dependsOn: [capability]
+    - id: capability
+      ordinal: 4
+      moduleRef: modules/capability
+      dependsOn: [knowledge-state]
+    - id: knowledge-state
+      ordinal: 5
+      moduleRef: modules/knowledge-state
+      dependsOn: [model-compute]
+    - id: model-compute
+      ordinal: 6
+      moduleRef: modules/model-compute
+      dependsOn: []
+  planes:
+    - trust-authority
+    - evidence-operations
+    - lifecycle-conformance
+  externalAgentSpecifications: []
+policies:
+  policyBundleDigest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  authorityEnforcedOutsideModel: true
+  approvalRequiredForHighRisk: true
+  artifactAttestationRequired: true
+  receiptChainRequired: true
+  retentionDays: 365
+  defaultDataBoundary: tenant
+  allowedModelHosting: [local, private-cloud, managed]
+capabilitySetDigest: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+conformanceProfiles: [core, enterprise]

@@ -1,0 +1,18 @@
+contractType: AdapterMapping
+apiVersion: agenticstrata.dev/v1
+mappingId: adapter/mcp
+protocol: mcp
+protocolVersion: configurable
+direction: bidirectional
+contractBindings:
+  - strataContract: CapabilityContract
+    protocolObject: tool definition and annotations
+    notes: Input schemas map directly while runtime risk and authority remain application-owned.
+  - strataContract: RuntimeArtifact
+    protocolObject: tool result content or resource reference
+    notes: Large results stay outside model context and return an attested reference.
+  - strataContract: TraceEvent
+    protocolObject: tool invocation observation
+    notes: Calls, denials, errors, and results all produce receipts.
+lossPolicy: explicit-loss
+extensionPoint: true

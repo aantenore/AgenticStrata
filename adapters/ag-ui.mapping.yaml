@@ -1,0 +1,18 @@
+contractType: AdapterMapping
+apiVersion: agenticstrata.dev/v1
+mappingId: adapter/ag-ui
+protocol: ag-ui
+protocolVersion: configurable
+direction: bidirectional
+contractBindings:
+  - strataContract: IntentEnvelope
+    protocolObject: run input and context
+    notes: Inbound text is normalized before it can become a canonical intent.
+  - strataContract: TraceEvent
+    protocolObject: lifecycle event
+    notes: Only user-safe summaries and evidence references are projected.
+  - strataContract: ApprovalReceipt
+    protocolObject: approval interaction result
+    notes: UI confirmation is evidence input; policy still validates the receipt.
+lossPolicy: explicit-loss
+extensionPoint: true

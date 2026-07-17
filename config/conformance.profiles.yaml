@@ -1,0 +1,35 @@
+apiVersion: agenticstrata.dev/v1
+profiles:
+  core:
+    extends: []
+    rules:
+      - schema.bundle
+      - architecture.complete-strata
+      - architecture.dependency-direction
+      - fingerprint.operational-bindings
+      - lineage.contract-bindings
+      - lineage.external-specifications
+      - lineage.runtime-artifacts
+      - lineage.receipt-chain
+      - authority.budget-monotonicity
+      - authority.delegation-attenuation
+      - authority.runtime-boundary
+      - capability.side-effect-safety
+      - evidence.summary-only
+  local-private:
+    extends: [core]
+    rules:
+      - privacy.local-boundary
+  enterprise:
+    extends: [core]
+    rules:
+      - authority.high-risk-approval
+      - policy.enterprise-controls
+  regulated:
+    extends: [enterprise]
+    rules:
+      - policy.regulated-controls
+  distributed:
+    extends: [enterprise]
+    rules:
+      - runtime.distributed-attribution
