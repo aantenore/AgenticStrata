@@ -32,10 +32,16 @@ Model output, retrieved content, external messages, tool descriptions, and impor
 | Duplicate JSON keys or oversized/alias-heavy input confuse the CLI | Duplicate-member rejection, file-size limits, and YAML alias limits. | Deep but valid JSON may still require process-level resource limits for hostile multi-tenant use. |
 | A report is replayed under ambiguous evaluator semantics | Reports bind evaluator name, package version, semantic revision, rule IDs, and effective configuration by digest. | The declared evaluator digest is not a code signature; trusted distribution or executable attestation is required for stronger provenance. |
 | Imported agent definition becomes mutable | Reference plus digest; embedded redefinition is rejected. | Availability and signature verification belong to the artifact resolver. |
+| A Passport mixes a run with another report or manifest | Creation recomputes canonical bundle and manifest digests, verifies the complete report and evaluator seals, and rejects mismatched run identity or terminal state. | Hashes do not establish who produced otherwise self-consistent artifacts. |
+| A Passport is interpreted as proof of success | The predicate carries separate explicit run and conformance statuses and permits failed or incomplete states. | Consumers must still enforce the statuses appropriate to their decision. |
+| Raw execution data leaks through placement evidence | The schema and CLI admit only strict content-free descriptors and reject extra resource fields. | Descriptor names, producer identifiers, and external URIs can still reveal topology; deployments may omit or pseudonymize them. |
+| An OASF digest is mistaken for semantic validation | The record is treated as opaque I-JSON and documentation requires validation by the owning ecosystem before binding. | A caller can still bind an invalid record if it ignores that prerequisite. |
+| A DSSE envelope is removed before consumption | Authenticated consumer policy rejects a bare Statement; unsigned acceptance is a separate explicit mode. | Trust still depends on external verifier configuration, signer identity constraints, and trust material. |
+| Statement bytes and digest semantics diverge | Subject digests use RFC 8785 semantic JSON canonicalization, and the CLI emits those exact canonical Statement bytes for an external signer. | Other tooling must preserve the documented payload type and verify the exact DSSE payload bytes. |
 
 ## Non-goals of the alpha
 
-- key management, digital signatures, or trusted timestamping;
+- built-in key management, digital-signature services, or trusted timestamping;
 - a policy language or identity provider;
 - credential brokering;
 - sandboxing model-generated code;

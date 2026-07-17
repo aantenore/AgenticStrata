@@ -10,8 +10,22 @@ AgenticStrata owns application-level runtime invariants. It deliberately leaves 
 | OpenTelemetry GenAI | Spans, decision summaries, conformance status | Private reasoning and sensitive payloads stay out of telemetry. |
 | CloudEvents | Receipt and artifact references | Correlation, tenant, privacy, and digest bindings survive transport. |
 | Policy engine | Grant, approval, attenuation query | The external enforcement point remains authoritative. |
+| OASF | Opaque agent-record subject descriptor | AgenticStrata binds canonical bytes but delegates semantic validation and media-type ownership. |
+| in-toto / DSSE | Execution Passport Statement and optional external envelope | The core owns deterministic binding; signing, identity, transparency, and trusted time stay outside it. |
+| Execution-placement provider | Content-free evidence descriptor | Inputs, outputs, prompts, response bodies, endpoints, raw errors, full plans, and provider payloads are excluded. |
 
 Adapter YAML files are declarative mappings with an explicit `lossPolicy`. They contain no vendor SDK and can be replaced without changing the core contract registry.
+
+## Attestation exchange
+
+The Execution Passport uses the project-controlled predicate namespace documented at [`docs/spec/attestations/execution-passport/v1`](spec/attestations/execution-passport/v1/README.md). The core writes exact RFC 8785 Statement bytes. A deployment may pass those bytes to an external DSSE/Sigstore adapter using payload type `application/vnd.in-toto+json`; no signing key, certificate flow, or Sigstore dependency enters AgenticStrata.
+
+Consumers choose one of two explicit policies:
+
+- **unsigned allowed**: verify schema, canonical digests, report binding, and local transport trust; this establishes integrity and association, not signer authenticity;
+- **authenticated required**: reject a bare Statement and require successful external envelope, signer-identity, and trust-material verification.
+
+There is no implicit fallback from the second policy to the first. This prevents signature removal from becoming a silent trust downgrade.
 
 ## Agent and flow specifications
 

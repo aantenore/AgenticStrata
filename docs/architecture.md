@@ -33,6 +33,7 @@ The `lint` command validates the complete set, canonical ordinal, unique declara
 - Runtime payloads are externalized as artifacts and bound by attestations.
 - Decisions expose concise summaries, selected and rejected options, and evidence references; private model reasoning is not a contract.
 - Distributed mode requires node attribution on every receipt.
+- An Execution Passport projects completed, failed, or incomplete run state into a strict in-toto Statement while keeping the run bundle, report, OASF record, and provider evidence out of the Statement body.
 
 ### Lifecycle & Conformance
 
@@ -68,6 +69,18 @@ sequenceDiagram
     State-->>Control: attested artifact
     Control-->>User: outcome + explanation + conformance
 ```
+
+## Execution Passport boundary
+
+Passport creation is a deterministic packaging step after conformance evaluation, not another conformance rule. The builder verifies the bundle and report schemas, report and evaluator seals, exact bundle and manifest bindings, receipt-chain integrity, run identity, terminal state, and issuance ordering. It then emits exactly three ordered subjects:
+
+1. the canonical `RunBundle` digest;
+2. the canonical digest of the complete `ConformanceReport`, including its own `digest` field;
+3. the canonical digest of one opaque, externally validated OASF record.
+
+Optional execution-placement evidence is already reduced by its producer to a content-free `ResourceDescriptor`. AgenticStrata admits only the descriptor, producer identity, fixed role, and `content-free` disclosure marker. It never consumes a provider’s full execution result through this boundary.
+
+The core emits an unsigned Statement. A replaceable external adapter may wrap its exact RFC 8785 bytes in DSSE and use Sigstore or another trust system. Signature verification, signer identity, transparency-log policy, and trusted time remain consumer-owned controls.
 
 ## Safe semantic caching
 

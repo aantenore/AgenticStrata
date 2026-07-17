@@ -37,7 +37,8 @@ Logical strata may share one process. The rule is a dependency and responsibilit
 - A composite cache fingerprint that requires both semantic and operational equivalence: policy, capability set, authoritative context, tenant, privacy, constraints, and outcome are all bound.
 - An RFC 8785 JSON Canonicalization Scheme implementation with cross-language golden vectors, strict duplicate-member rejection at the JSON boundary, and a hash-linked receipt chain with tamper and missing-evidence detection.
 - Runtime conformance checks for rooted authority, causal evidence, actual budget consumption, exact-action idempotency, approval, read-back or compensation, predeclared criterion evidence bindings, layer direction, and model/authority separation.
-- Mapping-only adapter documents for AG-UI, A2A, MCP, OpenTelemetry GenAI, CloudEvents, and an external policy engine.
+- An [Execution Passport](docs/spec/attestations/execution-passport/v1/README.md) that binds one run bundle, its complete conformance report, and one externally validated OASF record in a strict in-toto Statement without embedding those documents.
+- Mapping-only adapter documents for AG-UI, A2A, MCP, OpenTelemetry GenAI, CloudEvents, an external policy engine, OASF, and content-free execution-placement evidence.
 - A neutral prepare/commit/read-back demo with exact-action approval and duplicate suppression.
 
 ## Quick start
@@ -59,6 +60,19 @@ node dist/cli.js conformance examples/generic-change/run.bundle.json --profile e
 node dist/cli.js replay examples/generic-change/run.bundle.json
 node dist/cli.js explain examples/generic-change/run.bundle.json --profile enterprise
 ```
+
+After producing a report, bind it to a real OASF record that has been validated by its owning ecosystem:
+
+```bash
+node dist/cli.js passport .tmp/demo/run.bundle.json \
+  --report .tmp/demo/conformance-report.json \
+  --oasf-record /path/to/validated-oasf-record.json \
+  --oasf-media-type "$OASF_MEDIA_TYPE" \
+  --output .tmp/demo/execution-passport.json
+node dist/cli.js validate .tmp/demo/execution-passport.json
+```
+
+The output file contains exact RFC 8785 Statement bytes suitable for an external DSSE/Sigstore adapter. Repeat `--execution-evidence` only with strict `ExecutionEvidenceBinding` documents containing descriptors and digests, never provider output.
 
 All commands accept JSON; `validate` and `lint` also accept YAML. Build once with `npm run build` before invoking the repository-local CLI. Input documents are bounded to 16 MiB, JSON member names must be unique, and YAML alias expansion is limited.
 
@@ -85,6 +99,7 @@ This makes it complementary to:
 - [MCP](https://modelcontextprotocol.io/specification/2025-11-25) for tools and context;
 - [OpenTelemetry GenAI](https://github.com/open-telemetry/semantic-conventions-genai) for operational telemetry;
 - [CloudEvents](https://github.com/cloudevents/spec) for event interchange;
+- [in-toto Statement v1](https://github.com/in-toto/attestation/tree/main/spec/v1) for the Execution Passport envelope;
 - [Open Agent Spec](https://github.com/oracle/agent-spec) and [OSSA](https://openstandardagents.org/specification/) for portable pre-runtime definitions.
 
 Pattern and source-layout scanners can discover whether a project appears to use architectural conventions. AgenticStrata instead evaluates a declared manifest together with runtime receipts and artifacts. These are different, compatible jobs.
@@ -98,6 +113,9 @@ Read [Architecture](docs/architecture.md), [Contracts and conformance](docs/cont
 - Prepared actions, observed results, and compensation results use distinct attested evidence roles. Each evidence-required acceptance criterion predeclares the exact capability, action digest, and role it accepts; reusing pre-effect or unrelated evidence fails conformance.
 - Run status and conformance status are separate: a failed run can still have an intact, conformant evidence record, but it is never explained as a completed outcome.
 - Reports bind the evaluator name, package version, semantic revision, selected rule set, and effective profile configuration. The evaluator digest identifies the declared implementation revision; it is not a code signature.
+- An unsigned Execution Passport proves deterministic integrity and cross-artifact binding only. Authenticity requires an externally verified DSSE envelope or equivalent trusted channel, and consumers must make that requirement explicit so removing a signature cannot silently downgrade policy.
+- The OASF subject digest proves which opaque record was bound; it does not prove that the record is semantically valid OASF. Validate it before passport creation with the specification owner’s tooling.
+- Execution-placement evidence enters the predicate only as strict content-free descriptors. Raw inputs, outputs, prompts, response bodies, endpoints, errors, and full plans are outside the Passport contract.
 - A safe fingerprint binds the declared canonical intent. It does not prove that an upstream intent normalizer chose the correct meaning.
 - Adapter documents are integration contracts, not bundled protocol SDKs or policy engines.
 - The current release is an alpha contract surface. Version consumers explicitly before production adoption.

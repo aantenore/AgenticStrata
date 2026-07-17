@@ -11,6 +11,7 @@
 | Capability | `CapabilityContract` | Defines risk, effect, schemas, scopes, and side-effect lifecycle. |
 | Evidence | `DecisionEvidence`, `RuntimeArtifact`, `ArtifactAttestation`, `TraceEvent` | Reconstructs what was selected, applied, observed, and attested. |
 | Assessment | `ConformanceReport` | Records profile checks and evidence-backed pass/fail status. |
+| Attestation exchange | `ExecutionPassport`, `ExecutionEvidenceBinding`, `ResourceDescriptor` | Binds a run, assessment, external agent record, and content-free placement evidence without embedding payloads. |
 | Integration | `AdapterMapping` | Describes protocol projection and explicit information loss. |
 
 All integrity-bearing records use deterministic SHA-256 digests over [RFC 8785 JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785.html) output. AgenticStrata uses the maintained `canonicalize` implementation referenced by the RFC and tests standard key-ordering and number vectors. Inputs must be I-JSON values; the file boundary rejects duplicate JSON member names before the parsed value can enter the contract runtime. Digest verification proves that a record matches its bytes and references; issuer authenticity requires an external signature or trusted append-only store.
@@ -40,6 +41,18 @@ The core profile checks:
 `local-private` additionally requires runtime boundary evidence rather than declarations alone. Every supplied observation must cover the complete receipt window, be linked by the unique terminal receipt, and consistently attest local data, local model hosting, and no observed egress. A stale, partial, unlinked, or contradictory observation fails the profile even if another observation passes. Enterprise adds exact approval for high-risk commits and control flags. Regulated and distributed profiles add their respective boundary checks.
 
 Every report binds the run bundle, selected rule list, effective merged profile configuration, and evaluator identity by digest. Evaluator identity contains the package version plus an explicitly versioned conformance revision. This makes the assessment reproducible, prevents a custom profile from silently downgrading a built-in name, and exposes which evaluator semantics produced the result. The evaluator digest binds declared release metadata; authenticity and executable-byte attestation remain deployment concerns.
+
+## Execution Passport invariants
+
+The [v1 specification](spec/attestations/execution-passport/v1/README.md) is an in-toto Statement with one project-owned predicate URI. Its subject tuple has fixed order and length: run bundle, complete conformance report, external OASF record. Each subject is a strict `ResourceDescriptor` containing only a name, one SHA-256 digest, a media type, and an optional non-file URI. The report subject uses `digestValue(report)`, not `report.digest`: the former binds the complete serialized report, while the latter seals the report content before its own digest field is added.
+
+The predicate records `runStatus` and `conformanceStatus` separately. Creation does not require either status to be successful, so an incomplete or failed run can be bound honestly. It does require unambiguous run identity, a valid receipt chain, a sealed report and evaluator identity, matching bundle and manifest digests, report/receipt status agreement, and an issuance time no earlier than report generation.
+
+OASF input is accepted only as an opaque I-JSON object and canonicalized for its subject digest. AgenticStrata deliberately does not carry an OASF schema and therefore does not claim semantic validity. A caller must validate the record externally and provide the owner-declared media type.
+
+`executionEvidence` accepts only strict content-free bindings. The producer computes and publishes the evidence artifact digest; AgenticStrata carries its descriptor but never receives raw execution output through the CLI. This keeps provider semantics replaceable and prevents a full result object from becoming attestation content by accident.
+
+The Passport is created after assessment and is not required by a conformance rule. Making it a prerequisite of the report it contains would create a circular dependency.
 
 ## Evidence, not file detection
 
