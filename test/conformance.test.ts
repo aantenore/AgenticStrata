@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   API_VERSION,
+  EVALUATOR_NAME,
+  EVALUATOR_REVISION,
+  EVALUATOR_VERSION,
   appendTraceEvent,
   createCompositeFingerprint,
   digestValue,
@@ -58,6 +61,16 @@ describe("runtime conformance", () => {
     expect(report.status).toBe("pass");
     expect(report.checks.every((item) => item.status === "pass")).toBe(true);
     expect(report.runStatus).toBe("completed");
+    expect(report.evaluator).toEqual({
+      name: EVALUATOR_NAME,
+      version: EVALUATOR_VERSION,
+      revision: EVALUATOR_REVISION,
+      digest: digestValue({
+        name: EVALUATOR_NAME,
+        version: EVALUATOR_VERSION,
+        revision: EVALUATOR_REVISION
+      })
+    });
     expect(validateAs("ConformanceReport", report).valid).toBe(true);
     expect(reportIssues(report)).toEqual([]);
   });
@@ -168,6 +181,7 @@ describe("runtime conformance", () => {
       networkEgressObserved: false,
       endpointDigest: digestValue("local-runtime-endpoint"),
       producer: "runtime-boundary-observer",
+      observationStartedAt: "2026-07-17T12:00:00.000Z",
       observedAt: "2026-07-17T12:00:00.000Z"
     });
     local.runtimeBoundaries = [boundary];
@@ -178,6 +192,52 @@ describe("runtime conformance", () => {
     );
     local.traceEvents = resealTrace(local.traceEvents);
     expect(runConformance(local, "local-private").status).toBe("pass");
+
+    const stale = structuredClone(local);
+    const staleBoundary = stale.runtimeBoundaries[0];
+    if (staleBoundary === undefined) throw new Error("local boundary missing");
+    stale.runtimeBoundaries[0] = seal({
+      ...omitDigest(staleBoundary),
+      observationStartedAt: "2020-01-01T00:00:00.000Z",
+      observedAt: "2020-01-01T00:00:01.000Z"
+    });
+    expect(failedChecks(stale, "local-private")).toContain("privacy.local-boundary");
+
+    const earlyOnly = structuredClone(local);
+    const boundaryReference = `urn:agentic-strata:boundary:${boundary.boundaryEvidenceId}`;
+    const earlyEvent = earlyOnly.traceEvents[0];
+    const earlyTerminal = earlyOnly.traceEvents.at(-1);
+    if (earlyEvent === undefined || earlyTerminal === undefined) {
+      throw new Error("local trace missing");
+    }
+    earlyTerminal.evidenceRefs = earlyTerminal.evidenceRefs.filter(
+      (reference) => reference !== boundaryReference
+    );
+    earlyEvent.evidenceRefs.push(boundaryReference);
+    earlyOnly.traceEvents = resealTrace(earlyOnly.traceEvents);
+    expect(failedChecks(earlyOnly, "local-private")).toContain("privacy.local-boundary");
+
+    const contradictoryBoundary: RuntimeBoundaryEvidence = seal({
+      contractType: "RuntimeBoundaryEvidence",
+      apiVersion: API_VERSION,
+      boundaryEvidenceId: "boundary-managed-contradiction",
+      runId: local.execution.runId,
+      modelHosting: "managed",
+      dataBoundary: "global",
+      networkEgressObserved: true,
+      endpointDigest: digestValue("managed-runtime-endpoint"),
+      producer: "runtime-boundary-observer",
+      observationStartedAt: "2026-07-17T12:00:00.000Z",
+      observedAt: "2026-07-17T12:00:00.000Z"
+    });
+    local.runtimeBoundaries.push(contradictoryBoundary);
+    const currentTerminal = local.traceEvents.at(-1);
+    if (currentTerminal === undefined) throw new Error("demo terminal missing");
+    currentTerminal.evidenceRefs.push(
+      `urn:agentic-strata:boundary:${contradictoryBoundary.boundaryEvidenceId}`
+    );
+    local.traceEvents = resealTrace(local.traceEvents);
+    expect(failedChecks(local, "local-private")).toContain("privacy.local-boundary");
 
     const distributed = bundle();
     distributed.manifest.architecture.deploymentMode = "distributed";
@@ -254,6 +314,236 @@ describe("runtime conformance", () => {
     if (result === undefined) throw new Error("demo result attestation missing");
     Object.assign(result, seal({ ...omitDigest(result), subjectDigest: digestValue("other-action") }));
     expect(failedChecks(value)).toContain("capability.side-effect-safety");
+  });
+
+  it("does not reuse prepared-action evidence as post-effect verification", () => {
+    const value = bundle();
+    const preparedReference = "urn:agentic-strata:artifact:attestation-prepared-001";
+    value.artifacts = value.artifacts.filter(
+      (artifact) => artifact.artifactRef !== "artifact://change/result-001"
+    );
+    value.attestations = value.attestations.filter(
+      (attestation) => attestation.attestationId !== "attestation-result-001"
+    );
+    for (const result of value.criterionResults) {
+      Object.assign(
+        result,
+        seal({ ...omitDigest(result), evidenceRefs: [preparedReference] })
+      );
+    }
+    const verification = value.traceEvents.find(
+      (event) => event.eventType === "capability.verified"
+    );
+    const terminal = value.traceEvents.at(-1);
+    if (verification === undefined || terminal === undefined) {
+      throw new Error("demo verification or terminal missing");
+    }
+    verification.evidenceRefs = [preparedReference];
+    terminal.evidenceRefs = terminal.evidenceRefs.filter(
+      (reference) => !reference.includes("attestation-result-001")
+    );
+    value.traceEvents = resealTrace(value.traceEvents);
+    expect(failedChecks(value)).toEqual(
+      expect.arrayContaining([
+        "capability.side-effect-safety",
+        "outcome.acceptance-evidence"
+      ])
+    );
+  });
+
+  it("rejects result evidence created before its exact commit", () => {
+    const value = bundle();
+    const result = value.attestations.find(
+      (attestation) => attestation.attestationId === "attestation-result-001"
+    );
+    if (result === undefined) throw new Error("demo result attestation missing");
+    Object.assign(
+      result,
+      seal({ ...omitDigest(result), createdAt: "2026-07-17T11:59:59.000Z" })
+    );
+    expect(failedChecks(value)).toEqual(
+      expect.arrayContaining([
+        "lineage.evidence-causality",
+        "capability.side-effect-safety",
+        "outcome.acceptance-evidence"
+      ])
+    );
+  });
+
+  it("does not let evidence from another capability satisfy a criterion", () => {
+    const value = bundle();
+    const result = value.attestations.find(
+      (attestation) => attestation.attestationId === "attestation-result-001"
+    );
+    if (result === undefined) throw new Error("demo result attestation missing");
+    Object.assign(
+      result,
+      seal({
+        ...omitDigest(result),
+        capabilityId: "unrelated-capability"
+      })
+    );
+    expect(failedChecks(value)).toEqual(
+      expect.arrayContaining([
+        "capability.side-effect-safety",
+        "outcome.acceptance-evidence"
+      ])
+    );
+  });
+
+  it("does not let evidence from another action satisfy a criterion", () => {
+    const value = bundle();
+    const result = value.attestations.find(
+      (attestation) => attestation.attestationId === "attestation-result-001"
+    );
+    if (result === undefined) throw new Error("demo result attestation missing");
+    Object.assign(
+      result,
+      seal({ ...omitDigest(result), subjectDigest: digestValue("unrelated-action") })
+    );
+    expect(failedChecks(value)).toEqual(
+      expect.arrayContaining([
+        "capability.side-effect-safety",
+        "outcome.acceptance-evidence"
+      ])
+    );
+  });
+
+  it("rejects compensation receipts when the capability does not declare compensate", () => {
+    const value = bundle();
+    const capability = value.capabilities[0];
+    const attestation = value.attestations.find(
+      (candidate) => candidate.attestationId === "attestation-result-001"
+    );
+    const terminal = value.traceEvents.find(
+      (event) => event.eventType === "capability.verified"
+    );
+    if (capability === undefined || attestation === undefined || terminal === undefined) {
+      throw new Error("demo lifecycle records missing");
+    }
+    value.capabilities[0] = seal({
+      ...omitDigest(capability),
+      riskClass: "medium",
+      operations: capability.operations.filter((operation) => operation !== "compensate"),
+      sideEffectPolicy: { ...capability.sideEffectPolicy, compensationRequired: false }
+    });
+    Object.assign(
+      attestation,
+      seal({ ...omitDigest(attestation), evidenceRole: "compensation-result" })
+    );
+    value.outcome = seal({
+      ...omitDigest(value.outcome),
+      acceptanceCriteria: value.outcome.acceptanceCriteria.map((criterion) => ({
+        ...criterion,
+        evidenceRequirements: criterion.evidenceRequirements.map((requirement) => ({
+          ...requirement,
+          evidenceRole: "compensation-result" as const
+        }))
+      }))
+    });
+    terminal.eventType = "capability.compensated";
+    terminal.attributes = {
+      nodeId: "local-demo",
+      capabilityId: capability.capabilityId,
+      actionDigest: attestation.subjectDigest ?? "",
+      authorityGrantId: value.authorityGrants[0]?.grantId ?? "",
+      actorId: value.authorityGrants[0]?.subject ?? "",
+      resource: "configuration://workspace/sample-feature"
+    };
+    value.traceEvents = resealTrace(value.traceEvents);
+    expect(failedChecks(value)).toContain("capability.side-effect-safety");
+  });
+
+  it("rejects orphan compensation without a committed action and compensation evidence", () => {
+    const value = bundle();
+    const terminalIndex = value.traceEvents.findIndex((event) => event.eventType === "run.completed");
+    const authority = value.authorityGrants[0];
+    if (terminalIndex < 0 || authority === undefined) throw new Error("demo records missing");
+    const orphan = appendTraceEvent(value.traceEvents[terminalIndex - 1], {
+      eventId: "event-orphan-compensation",
+      runId: value.execution.runId,
+      sequence: terminalIndex,
+      eventType: "capability.compensated",
+      stratum: "capability",
+      summary: "Compensation was claimed for an unknown action.",
+      attributes: {
+        nodeId: "local-demo",
+        capabilityId: "generic-change",
+        actionDigest: digestValue("unknown-action"),
+        authorityGrantId: authority.grantId,
+        actorId: authority.subject,
+        resource: "configuration://workspace/sample-feature"
+      },
+      evidenceRefs: [],
+      occurredAt: "2026-07-17T12:00:00.000Z"
+    });
+    value.traceEvents.splice(terminalIndex, 0, orphan);
+    value.traceEvents = resealTrace(
+      value.traceEvents.map((event, sequence) => ({ ...event, sequence }))
+    );
+    expect(failedChecks(value)).toContain("capability.side-effect-safety");
+  });
+
+  it("requires observed artifact evidence for a passed acceptance criterion", () => {
+    const value = bundle();
+    const authority = value.authorityGrants[0];
+    if (authority === undefined) throw new Error("demo authority missing");
+    const authorityReference = `urn:agentic-strata:authority:${authority.grantId}`;
+    for (const result of value.criterionResults) {
+      Object.assign(
+        result,
+        seal({ ...omitDigest(result), evidenceRefs: [authorityReference] })
+      );
+    }
+    expect(failedChecks(value)).toContain("outcome.acceptance-evidence");
+  });
+
+  it("fails closed when an evidence-required criterion declares no exact requirement", () => {
+    const value = bundle();
+    value.outcome = seal({
+      ...omitDigest(value.outcome),
+      acceptanceCriteria: value.outcome.acceptanceCriteria.map((criterion) => ({
+        ...criterion,
+        evidenceRequirements: []
+      }))
+    });
+    expect(failedChecks(value)).toEqual(
+      expect.arrayContaining(["schema.bundle", "outcome.acceptance-evidence"])
+    );
+  });
+
+  it("requires bound artifact evidence for failed criteria as well", () => {
+    const value = bundle();
+    const authority = value.authorityGrants[0];
+    const terminal = value.traceEvents.at(-1);
+    if (authority === undefined || terminal === undefined) throw new Error("demo records missing");
+    const authorityReference = `urn:agentic-strata:authority:${authority.grantId}`;
+    value.criterionResults = value.criterionResults.map((result) =>
+      seal({
+        ...omitDigest(result),
+        status: "failed" as const,
+        summary: "The required outcome was not observed.",
+        evidenceRefs: [authorityReference]
+      })
+    );
+    terminal.eventType = "run.failed";
+    terminal.summary = "The run failed without outcome evidence.";
+    value.traceEvents = resealTrace(value.traceEvents);
+    expect(failedChecks(value)).toContain("outcome.acceptance-evidence");
+  });
+
+  it("rejects duplicate acceptance criterion identifiers", () => {
+    const value = bundle();
+    const criterion = value.outcome.acceptanceCriteria[0];
+    if (criterion === undefined) throw new Error("demo criterion missing");
+    value.outcome = seal({
+      ...omitDigest(value.outcome),
+      acceptanceCriteria: [
+        ...value.outcome.acceptanceCriteria,
+        { ...criterion, assertion: "A different assertion reuses the same identifier." }
+      ]
+    });
+    expect(failedChecks(value)).toContain("outcome.acceptance-evidence");
   });
 
   it("rejects duplicate commits for one action even with different idempotency keys", () => {

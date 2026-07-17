@@ -98,6 +98,7 @@
         "networkEgressObserved": { "type": "boolean" },
         "endpointDigest": { "$ref": "#/$defs/Digest" },
         "producer": { "$ref": "#/$defs/Identifier" },
+        "observationStartedAt": { "type": "string", "format": "date-time" },
         "observedAt": { "type": "string", "format": "date-time" },
         "digest": { "$ref": "#/$defs/Digest" }
       },
@@ -111,6 +112,7 @@
         "networkEgressObserved",
         "endpointDigest",
         "producer",
+        "observationStartedAt",
         "observedAt",
         "digest"
       ]
@@ -368,9 +370,45 @@
             "properties": {
               "id": { "$ref": "#/$defs/Identifier" },
               "assertion": { "type": "string", "minLength": 1 },
-              "evidenceRequired": { "type": "boolean" }
+              "evidenceRequired": { "type": "boolean" },
+              "evidenceRequirements": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": { "type": "string", "const": "artifact-attestation" },
+                    "capabilityId": { "$ref": "#/$defs/Identifier" },
+                    "subjectDigest": { "$ref": "#/$defs/Digest" },
+                    "evidenceRole": {
+                      "type": "string",
+                      "enum": ["observed-result", "compensation-result"]
+                    }
+                  },
+                  "required": ["kind", "capabilityId", "subjectDigest", "evidenceRole"]
+                }
+              }
             },
-            "required": ["id", "assertion", "evidenceRequired"]
+            "allOf": [
+              {
+                "if": {
+                  "properties": { "evidenceRequired": { "const": true } },
+                  "required": ["evidenceRequired"]
+                },
+                "then": {
+                  "properties": {
+                    "evidenceRequirements": { "type": "array", "minItems": 1 }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "evidenceRequirements": { "type": "array", "maxItems": 0 }
+                  }
+                }
+              }
+            ],
+            "required": ["id", "assertion", "evidenceRequired", "evidenceRequirements"]
           }
         },
         "forbiddenOutcomes": {
@@ -735,6 +773,10 @@
         "artifactDigest": { "$ref": "#/$defs/Digest" },
         "capabilityId": { "$ref": "#/$defs/Identifier" },
         "subjectDigest": { "$ref": "#/$defs/Digest" },
+        "evidenceRole": {
+          "type": "string",
+          "enum": ["prepared-action", "observed-result", "compensation-result", "generic"]
+        },
         "producer": { "$ref": "#/$defs/Identifier" },
         "createdAt": { "type": "string", "format": "date-time" },
         "provenanceRefs": {
@@ -744,6 +786,11 @@
           "uniqueItems": true
         },
         "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "dependentRequired": {
+        "capabilityId": ["subjectDigest", "evidenceRole"],
+        "subjectDigest": ["capabilityId", "evidenceRole"],
+        "evidenceRole": ["capabilityId", "subjectDigest"]
       },
       "required": [
         "contractType",
@@ -884,6 +931,25 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": { "eventType": { "const": "capability.compensated" } },
+            "required": ["eventType"]
+          },
+          "then": {
+            "properties": {
+              "attributes": {
+                "type": "object",
+                "properties": {
+                  "authorityGrantId": { "$ref": "#/$defs/Identifier" },
+                  "actorId": { "$ref": "#/$defs/Identifier" },
+                  "resource": { "type": "string", "minLength": 1 }
+                },
+                "required": ["authorityGrantId", "actorId", "resource"]
+              }
+            }
+          }
         }
       ],
       "required": [
@@ -934,6 +1000,20 @@
           "type": "string",
           "enum": ["completed", "failed", "incomplete"]
         },
+        "evaluator": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "const": "agentic-strata" },
+            "version": { "type": "string", "const": "0.1.0-alpha.1" },
+            "revision": {
+              "type": "string",
+              "const": "conformance-2026-07-17.3"
+            },
+            "digest": { "$ref": "#/$defs/Digest" }
+          },
+          "required": ["name", "version", "revision", "digest"]
+        },
         "manifestDigest": { "$ref": "#/$defs/Digest" },
         "runBundleDigest": { "$ref": "#/$defs/Digest" },
         "profileConfigurationDigest": { "$ref": "#/$defs/Digest" },
@@ -953,6 +1033,7 @@
         "profile",
         "status",
         "runStatus",
+        "evaluator",
         "manifestDigest",
         "runBundleDigest",
         "profileConfigurationDigest",

@@ -5,7 +5,7 @@ import { Command, InvalidArgumentError } from "commander";
 
 import { readDocument, writeJson, writeText } from "./adapters/documents.js";
 import { validateAs, validateDocument } from "./contracts/registry.js";
-import { CONFORMANCE_PROFILES } from "./contracts/types.js";
+import { CONFORMANCE_PROFILES, EVALUATOR_VERSION } from "./contracts/types.js";
 import type {
   ApplicationManifest,
   ConformanceProfile,
@@ -50,7 +50,7 @@ function requireBundle(path: string): RunBundle {
 const program = new Command()
   .name("agentic-strata")
   .description("Validate and explain executable AgenticStrata contracts.")
-  .version("0.1.0-alpha.1");
+  .version(EVALUATOR_VERSION);
 
 program
   .command("validate")

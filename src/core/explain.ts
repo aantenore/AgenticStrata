@@ -52,11 +52,17 @@ export function explainRun(bundle: RunBundle, report?: ConformanceReport): strin
       const result = bundle.criterionResults.find(
         (candidate) => candidate.criterionId === criterion.id
       );
+      const requirements = criterion.evidenceRequirements
+        .map(
+          (requirement) =>
+            `${requirement.capabilityId}/${requirement.subjectDigest}/${requirement.evidenceRole}`
+        )
+        .join(", ");
       return result === undefined
-        ? `- [missing] ${criterion.id}: ${criterion.assertion}`
+        ? `- [missing] ${criterion.id}: ${criterion.assertion} Required evidence: ${requirements || "none"}.`
         : `- [${result.status}] ${criterion.id}: ${result.summary} Evidence: ${
             result.evidenceRefs.join(", ") || "none"
-          }.`;
+          }. Required: ${requirements || "none"}.`;
     }),
     "",
     "## Authority and collaboration",
@@ -110,6 +116,7 @@ export function explainRun(bundle: RunBundle, report?: ConformanceReport): strin
       `- Profile: ${report.profile}`,
       `- Conformance status: ${report.status}`,
       `- Run status: ${report.runStatus}`,
+      `- Evaluator: ${report.evaluator.name} ${report.evaluator.version} (${report.evaluator.revision}; ${report.evaluator.digest})`,
       ...report.checks.map((item) => `- [${item.status}] ${item.id}: ${item.message}`)
     );
   }

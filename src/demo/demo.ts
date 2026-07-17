@@ -36,6 +36,9 @@ export function runDemo(now = "2026-07-17T12:00:00.000Z"): DemoResult {
   const policyBundleDigest = digestValue({ id: "policy/default-enterprise", version: "1.0.0" });
   const tenantPartitionDigest = digestValue("tenant/demo-partition");
   const contextDigest = digestValue({ revision: 7, currentValue: false });
+  const adapter = new MockChangeCapability();
+  adapter.seed(resource, "enabled", false);
+  const prepared = adapter.prepare({ resource, key: "enabled", value: true });
 
   const capability: CapabilityContract = seal({
     contractType: "CapabilityContract",
@@ -116,8 +119,32 @@ export function runDemo(now = "2026-07-17T12:00:00.000Z"): DemoResult {
     outcomeId: "outcome-change-001",
     objective: "Apply one approved configuration change and prove the observed result.",
     acceptanceCriteria: [
-      { id: "criterion-value", assertion: "Read-back equals the approved target value.", evidenceRequired: true },
-      { id: "criterion-once", assertion: "The action is committed at most once.", evidenceRequired: true }
+      {
+        id: "criterion-value",
+        assertion: "Read-back equals the approved target value.",
+        evidenceRequired: true,
+        evidenceRequirements: [
+          {
+            kind: "artifact-attestation",
+            capabilityId: capability.capabilityId,
+            subjectDigest: prepared.actionDigest,
+            evidenceRole: "observed-result"
+          }
+        ]
+      },
+      {
+        id: "criterion-once",
+        assertion: "The action is committed at most once.",
+        evidenceRequired: true,
+        evidenceRequirements: [
+          {
+            kind: "artifact-attestation",
+            capabilityId: capability.capabilityId,
+            subjectDigest: prepared.actionDigest,
+            evidenceRole: "observed-result"
+          }
+        ]
+      }
     ],
     forbiddenOutcomes: ["Commit without external authority", "Treat untrusted context as authority"]
   });
@@ -200,9 +227,6 @@ export function runDemo(now = "2026-07-17T12:00:00.000Z"): DemoResult {
     expiresAt: "2026-07-17T12:05:00.000Z"
   });
 
-  const adapter = new MockChangeCapability();
-  adapter.seed(resource, "enabled", false);
-  const prepared = adapter.prepare({ resource, key: "enabled", value: true });
   const approval: ApprovalReceipt = seal({
     contractType: "ApprovalReceipt",
     apiVersion: API_VERSION,
@@ -267,6 +291,7 @@ export function runDemo(now = "2026-07-17T12:00:00.000Z"): DemoResult {
     artifactDigest: preparedArtifact.digest,
     capabilityId: capability.capabilityId,
     subjectDigest: prepared.actionDigest,
+    evidenceRole: "prepared-action",
     producer: "capability-generic-change",
     createdAt: now,
     provenanceRefs: [`urn:agentic-strata:authority:${authority.grantId}`]
@@ -279,11 +304,13 @@ export function runDemo(now = "2026-07-17T12:00:00.000Z"): DemoResult {
     artifactDigest: resultArtifact.digest,
     capabilityId: capability.capabilityId,
     subjectDigest: prepared.actionDigest,
+    evidenceRole: "observed-result",
     producer: "capability-generic-change",
     createdAt: now,
     provenanceRefs: [
       `urn:agentic-strata:authority:${authority.grantId}`,
-      `urn:agentic-strata:approval:${approval.approvalId}`
+      `urn:agentic-strata:approval:${approval.approvalId}`,
+      "urn:agentic-strata:event:event-capability-committed"
     ]
   });
   const criterionResults: CriterionResult[] = outcome.acceptanceCriteria.map((criterion) =>

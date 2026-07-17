@@ -1,11 +1,18 @@
-import { API_VERSION } from "../contracts/types.js";
+import {
+  API_VERSION,
+  EVALUATOR_NAME,
+  EVALUATOR_REVISION,
+  EVALUATOR_VERSION
+} from "../contracts/types.js";
 import type {
+  ArtifactAttestation,
   AuthorityGrant,
   CapabilityContract,
   ConformanceCheck,
   ConformanceProfile,
   ConformanceReport,
   RunBundle,
+  RuntimeArtifact,
   TraceEvent,
   ValidationIssue
 } from "../contracts/types.js";
@@ -97,35 +104,133 @@ function authorityForCommit(
   return valid ? grant : undefined;
 }
 
-function evidenceBindsAction(
+interface AttestedArtifact {
+  attestation: ArtifactAttestation;
+  artifact: RuntimeArtifact;
+}
+
+function resolveAttestedArtifact(
   bundle: RunBundle,
-  reference: string,
-  capabilityId: string,
-  actionDigest: string
-): boolean {
+  reference: string
+): AttestedArtifact | undefined {
   const prefix = "urn:agentic-strata:artifact:";
   if (!reference.startsWith(prefix)) {
-    return false;
+    return undefined;
   }
   const attestation = bundle.attestations.find(
     (candidate) => candidate.attestationId === reference.slice(prefix.length)
   );
-  if (
-    attestation === undefined ||
-    attestation.capabilityId !== capabilityId ||
-    attestation.subjectDigest !== actionDigest ||
-    !verifySeal(attestation)
-  ) {
-    return false;
+  if (attestation === undefined || !verifySeal(attestation)) {
+    return undefined;
   }
   const artifact = bundle.artifacts.find(
     (candidate) => candidate.artifactRef === attestation.artifactRef
   );
+  if (
+    artifact === undefined ||
+    artifact.digest !== attestation.artifactDigest ||
+    digestValue(artifact.payload) !== artifact.digest
+  ) {
+    return undefined;
+  }
+  return { attestation, artifact };
+}
+
+function evidenceBindsAction(
+  bundle: RunBundle,
+  reference: string,
+  capabilityId: string,
+  actionDigest: string,
+  evidenceRole: NonNullable<ArtifactAttestation["evidenceRole"]>
+): boolean {
+  const resolved = resolveAttestedArtifact(bundle, reference);
   return (
-    artifact !== undefined &&
-    artifact.digest === attestation.artifactDigest &&
-    digestValue(artifact.payload) === artifact.digest
+    resolved !== undefined &&
+    resolved.attestation.capabilityId === capabilityId &&
+    resolved.attestation.subjectDigest === actionDigest &&
+    resolved.attestation.evidenceRole === evidenceRole
   );
+}
+
+function lifecycleEvidenceBindsAction(
+  bundle: RunBundle,
+  reference: string,
+  capabilityId: string,
+  actionDigest: string,
+  evidenceRole: NonNullable<ArtifactAttestation["evidenceRole"]>,
+  event: TraceEvent
+): boolean {
+  if (!evidenceBindsAction(bundle, reference, capabilityId, actionDigest, evidenceRole)) {
+    return false;
+  }
+  const resolved = resolveAttestedArtifact(bundle, reference);
+  if (resolved === undefined) {
+    return false;
+  }
+  const evidenceAt = Date.parse(resolved.attestation.createdAt);
+  const eventAt = Date.parse(event.occurredAt);
+  if (!Number.isFinite(evidenceAt) || !Number.isFinite(eventAt) || evidenceAt > eventAt) {
+    return false;
+  }
+  if (evidenceRole === "prepared-action") {
+    return true;
+  }
+
+  const precedingCommits = bundle.traceEvents.filter(
+    (candidate) =>
+      candidate.eventType === "capability.committed" &&
+      candidate.sequence < event.sequence &&
+      candidate.attributes.capabilityId === capabilityId &&
+      candidate.attributes.actionDigest === actionDigest
+  );
+  if (precedingCommits.length !== 1) {
+    return false;
+  }
+  const commit = precedingCommits[0];
+  if (commit === undefined) {
+    return false;
+  }
+  const commitAt = Date.parse(commit.occurredAt);
+  return (
+    Number.isFinite(commitAt) &&
+    evidenceAt >= commitAt &&
+    resolved.attestation.provenanceRefs.includes(
+      `urn:agentic-strata:event:${commit.eventId}`
+    )
+  );
+}
+
+function criterionRequirementSatisfied(
+  bundle: RunBundle,
+  reference: string,
+  requirement: RunBundle["outcome"]["acceptanceCriteria"][number]["evidenceRequirements"][number],
+  resultObservedAt: string
+): boolean {
+  const resultAt = Date.parse(resultObservedAt);
+  if (!Number.isFinite(resultAt)) {
+    return false;
+  }
+  return bundle.traceEvents.some((event) => {
+    const expectedEventType =
+      requirement.evidenceRole === "observed-result"
+        ? "capability.verified"
+        : "capability.compensated";
+    return (
+      event.eventType === expectedEventType &&
+      event.attributes.capabilityId === requirement.capabilityId &&
+      event.attributes.actionDigest === requirement.subjectDigest &&
+      event.evidenceRefs.includes(reference) &&
+      Date.parse(event.occurredAt) <= resultAt &&
+      lifecycleEvidenceBindsAction(
+        bundle,
+        reference,
+        requirement.capabilityId,
+        requirement.subjectDigest,
+        requirement.evidenceRole,
+        event
+      )
+    );
+  });
 }
 
 function referenceSealIssues(bundle: RunBundle): string[] {
@@ -211,6 +316,20 @@ function identityLineageIssues(bundle: RunBundle): string[] {
       result.outcomeId !== bundle.outcome.outcomeId
     ) {
       issues.push(`criterion:${result.resultId}:run-outcome`);
+    }
+  }
+  for (const boundary of bundle.runtimeBoundaries) {
+    if (boundary.runId !== bundle.execution.runId) {
+      issues.push(`boundary:${boundary.boundaryEvidenceId}:run`);
+    }
+    const observationStartedAt = Date.parse(boundary.observationStartedAt);
+    const observedAt = Date.parse(boundary.observedAt);
+    if (
+      !Number.isFinite(observationStartedAt) ||
+      !Number.isFinite(observedAt) ||
+      observationStartedAt > observedAt
+    ) {
+      issues.push(`boundary:${boundary.boundaryEvidenceId}:observation-window`);
     }
   }
   for (const approval of bundle.approvals) {
@@ -421,7 +540,11 @@ function outcomeEvidenceIssues(bundle: RunBundle): string[] {
   const known = evidenceIndex(bundle);
   const terminal = bundle.traceEvents.at(-1);
   const terminalStatus = runStatus(bundle);
-  const criterionIds = new Set(bundle.outcome.acceptanceCriteria.map((criterion) => criterion.id));
+  const declaredCriterionIds = bundle.outcome.acceptanceCriteria.map((criterion) => criterion.id);
+  const criterionIds = new Set(declaredCriterionIds);
+  if (criterionIds.size !== declaredCriterionIds.length) {
+    issues.push("outcome:duplicate-criterion-id");
+  }
 
   for (const result of bundle.criterionResults) {
     if (!criterionIds.has(result.criterionId)) {
@@ -450,8 +573,22 @@ function outcomeEvidenceIssues(bundle: RunBundle): string[] {
     if (result === undefined) {
       continue;
     }
-    if (criterion.evidenceRequired && result.evidenceRefs.length === 0) {
-      issues.push(`${criterion.id}:missing-evidence`);
+    if (
+      criterion.evidenceRequired &&
+      (criterion.evidenceRequirements.length === 0 ||
+        criterion.evidenceRequirements.some(
+          (requirement) =>
+            !result.evidenceRefs.some((reference) =>
+              criterionRequirementSatisfied(
+                bundle,
+                reference,
+                requirement,
+                result.observedAt
+              )
+            )
+        ))
+    ) {
+      issues.push(`${criterion.id}:unsatisfied-evidence-requirement`);
     }
     if (terminalStatus === "completed" && result.status !== "passed") {
       issues.push(`${criterion.id}:completed-without-pass`);
@@ -569,6 +706,75 @@ function sideEffectIssues(bundle: RunBundle): string[] {
     }
   }
 
+  for (const event of bundle.traceEvents.filter((candidate) =>
+    ["capability.prepared", "capability.verified", "capability.compensated"].includes(
+      candidate.eventType
+    )
+  )) {
+    const capability = capabilityFor(bundle, event);
+    const actionDigest = event.attributes.actionDigest;
+    if (capability === undefined) {
+      issues.push(`${event.eventId}:unknown-capability`);
+      continue;
+    }
+    if (!effectful.includes(capability)) {
+      if (event.eventType === "capability.compensated") {
+        issues.push(`${event.eventId}:compensation-on-non-effectful-capability`);
+      }
+      continue;
+    }
+    if (
+      event.eventType === "capability.compensated" &&
+      !capability.operations.includes("compensate")
+    ) {
+      issues.push(`${event.eventId}:undeclared-compensation-operation`);
+      continue;
+    }
+    if (!isDigest(actionDigest)) {
+      issues.push(`${event.eventId}:invalid-action-binding`);
+      continue;
+    }
+
+    if (event.eventType === "capability.prepared") {
+      if (
+        !event.evidenceRefs.some((reference) =>
+          lifecycleEvidenceBindsAction(
+            bundle,
+            reference,
+            capability.capabilityId,
+            actionDigest,
+            "prepared-action",
+            event
+          )
+        )
+      ) {
+        issues.push(`${event.eventId}:invalid-prepare-evidence`);
+      }
+      continue;
+    }
+
+    const expectedRole =
+      event.eventType === "capability.verified"
+        ? "observed-result"
+        : "compensation-result";
+    const evidenceValid = event.evidenceRefs.some((reference) =>
+      lifecycleEvidenceBindsAction(
+        bundle,
+        reference,
+        capability.capabilityId,
+        actionDigest,
+        expectedRole,
+        event
+      )
+    );
+    const authorityValid =
+      event.eventType !== "capability.compensated" ||
+      authorityForCommit(bundle, capability, event) !== undefined;
+    if (!evidenceValid || !authorityValid) {
+      issues.push(`${event.eventId}:orphan-or-unproven-terminal`);
+    }
+  }
+
   const committedKeys = new Set<string>();
   const committedActions = new Set<string>();
   for (const commit of bundle.traceEvents.filter((event) => event.eventType === "capability.committed")) {
@@ -582,31 +788,57 @@ function sideEffectIssues(bundle: RunBundle): string[] {
     }
     const actionDigest = commit.attributes.actionDigest;
     const idempotencyKey = commit.attributes.idempotencyKey;
-    const bindingValid = isDigest(actionDigest) && typeof idempotencyKey === "string" && idempotencyKey.length > 0;
-    const prepared = bindingValid && bundle.traceEvents.some(
-      (event) =>
-        event.eventType === "capability.prepared" &&
-        event.sequence < commit.sequence &&
-        event.attributes.capabilityId === capability.capabilityId &&
-        event.attributes.actionDigest === actionDigest &&
-        event.evidenceRefs.some((reference) =>
-          evidenceBindsAction(bundle, reference, capability.capabilityId, actionDigest)
-        )
-    );
-    const terminal = bindingValid && bundle.traceEvents.some(
-      (event) =>
-        ((event.eventType === "capability.verified" && event.attributes.verified === true) ||
-          event.eventType === "capability.compensated") &&
-        event.sequence > commit.sequence &&
-        event.attributes.capabilityId === capability.capabilityId &&
-        event.attributes.actionDigest === actionDigest &&
-        event.evidenceRefs.some(
-          (reference) =>
-            reference.startsWith("urn:agentic-strata:artifact:") &&
-            knownEvidence.has(reference) &&
-            evidenceBindsAction(bundle, reference, capability.capabilityId, actionDigest)
-        )
-    );
+    const bindingValid =
+      isDigest(actionDigest) &&
+      typeof idempotencyKey === "string" &&
+      idempotencyKey.length > 0;
+    const preparedEvents = bindingValid
+      ? bundle.traceEvents.filter(
+          (event) =>
+            event.eventType === "capability.prepared" &&
+            event.sequence < commit.sequence &&
+            event.attributes.capabilityId === capability.capabilityId &&
+            event.attributes.actionDigest === actionDigest &&
+            event.evidenceRefs.some((reference) =>
+              lifecycleEvidenceBindsAction(
+                bundle,
+                reference,
+                capability.capabilityId,
+                actionDigest,
+                "prepared-action",
+                event
+              )
+            )
+          )
+      : [];
+    const terminalEvents = bindingValid
+      ? bundle.traceEvents.filter(
+          (event) =>
+            ((event.eventType === "capability.verified" &&
+              event.attributes.verified === true) ||
+              event.eventType === "capability.compensated") &&
+            event.sequence > commit.sequence &&
+            event.attributes.capabilityId === capability.capabilityId &&
+            event.attributes.actionDigest === actionDigest &&
+            event.evidenceRefs.some(
+              (reference) =>
+                reference.startsWith("urn:agentic-strata:artifact:") &&
+                knownEvidence.has(reference) &&
+                lifecycleEvidenceBindsAction(
+                  bundle,
+                  reference,
+                  capability.capabilityId,
+                  actionDigest,
+                  event.eventType === "capability.verified"
+                    ? "observed-result"
+                    : "compensation-result",
+                  event
+                )
+            )
+          )
+      : [];
+    const prepared = preparedEvents.length === 1;
+    const terminal = terminalEvents.length === 1;
     const authorized = authorityForCommit(bundle, capability, commit) !== undefined;
     if (!bindingValid || !prepared || !terminal || !authorized) {
       issues.push(`${commit.eventId}:runtime`);
@@ -872,31 +1104,42 @@ const rules: Record<string, Rule> = {
     ),
   "privacy.local-boundary": (bundle) => {
     const policy = bundle.manifest.policies;
-    const boundary = bundle.runtimeBoundaries.find(
-      (candidate) =>
-        candidate.runId === bundle.execution.runId &&
-        candidate.modelHosting === "local" &&
-        candidate.dataBoundary === "local" &&
-        candidate.networkEgressObserved === false &&
-        verifySeal(candidate)
+    const terminal =
+      terminalReceiptIssues(bundle).length === 0 ? bundle.traceEvents.at(-1) : undefined;
+    const firstEvent = bundle.traceEvents[0];
+    const firstEventAt = Date.parse(firstEvent?.occurredAt ?? "");
+    const terminalAt = Date.parse(terminal?.occurredAt ?? "");
+    const boundaryReferences = bundle.runtimeBoundaries.map(
+      (boundary) => `urn:agentic-strata:boundary:${boundary.boundaryEvidenceId}`
     );
-    const boundaryReference =
-      boundary === undefined
-        ? undefined
-        : `urn:agentic-strata:boundary:${boundary.boundaryEvidenceId}`;
+    const runtimeEvidenceValid =
+      terminal !== undefined &&
+      Number.isFinite(firstEventAt) &&
+      Number.isFinite(terminalAt) &&
+      bundle.runtimeBoundaries.length > 0 &&
+      bundle.runtimeBoundaries.every(
+        (boundary, index) =>
+          boundary.runId === bundle.execution.runId &&
+          boundary.modelHosting === "local" &&
+          boundary.dataBoundary === "local" &&
+          boundary.networkEgressObserved === false &&
+          Date.parse(boundary.observationStartedAt) <= firstEventAt &&
+          Date.parse(boundary.observedAt) >= terminalAt &&
+          verifySeal(boundary) &&
+          terminal.evidenceRefs.includes(boundaryReferences[index] ?? "")
+      );
     const valid =
       policy.defaultDataBoundary === "local" &&
       policy.allowedModelHosting.length === 1 &&
       policy.allowedModelHosting[0] === "local" &&
       bundle.execution.profile === "privacy" &&
-      boundaryReference !== undefined &&
-      bundle.traceEvents.some((event) => event.evidenceRefs.includes(boundaryReference));
+      runtimeEvidenceValid;
     return check(
       "privacy.local-boundary",
       valid,
-      "Runtime evidence attests local data, local model hosting, no observed egress, and the privacy execution profile.",
-      "The local-private profile requires a sealed, receipt-linked runtime boundary observation in addition to local declarations.",
-      boundaryReference === undefined ? [] : [boundaryReference]
+      "Runtime evidence covers the full receipt window and attests local data, local model hosting, no observed egress, and the privacy execution profile.",
+      "The local-private profile requires every sealed boundary observation to cover the full run and be linked by its terminal receipt.",
+      boundaryReferences
     );
   },
   "authority.high-risk-approval": (bundle) => {
@@ -968,11 +1211,18 @@ export function runConformance(
   const runBundleDigest = digestValue(bundle);
   const profileConfigurationDigest = digestValue(configuration);
   const rulesDigest = digestValue(selectedRules);
+  const evaluatorUnsigned = {
+    name: EVALUATOR_NAME,
+    version: EVALUATOR_VERSION,
+    revision: EVALUATOR_REVISION
+  };
+  const evaluator = { ...evaluatorUnsigned, digest: digestValue(evaluatorUnsigned) };
   const evaluationDigest = digestValue({
     profile,
     runBundleDigest,
     profileConfigurationDigest,
     rulesDigest,
+    evaluatorDigest: evaluator.digest,
     generatedAt
   });
   const unsigned: Omit<ConformanceReport, "digest"> = {
@@ -982,6 +1232,7 @@ export function runConformance(
     profile,
     status: checks.every((item) => item.status !== "fail") ? "pass" : "fail",
     runStatus: runStatus(bundle),
+    evaluator,
     manifestDigest: digestValue(bundle.manifest),
     runBundleDigest,
     profileConfigurationDigest,

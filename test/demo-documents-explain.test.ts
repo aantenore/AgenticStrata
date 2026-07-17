@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import packageMetadata from "../package.json" with { type: "json" };
 
 import { describe, expect, it } from "vitest";
 
@@ -22,7 +23,9 @@ describe("executable enterprise change example", () => {
     expect(result.readBack).toBe(true);
     expect(result.duplicateWasSuppressed).toBe(true);
     expect(explanation).toContain("Replay integrity: valid");
+    expect(explanation).toContain(`Evaluator: ${report.evaluator.name} ${report.evaluator.version}`);
     expect(explanation).toContain("not private model reasoning");
+    expect(report.evaluator.version).toBe(packageMetadata.version);
   });
 
   it("fails closed when an idempotency key is reused for another action", () => {
@@ -93,5 +96,22 @@ describe("JSON and YAML document boundary", () => {
     expect(readFileSync(jsonPath, "utf8").endsWith("\n")).toBe(true);
     expect(readFileSync(textPath, "utf8")).toBe("evidence\n");
     expect(() => readDocument(directory)).toThrow("regular file");
+  });
+
+  it("rejects duplicate JSON member names and non-I-JSON strings", () => {
+    const directory = mkdtempSync(join(tmpdir(), "agentic-strata-strict-json-"));
+    const duplicatePath = join(directory, "duplicate.json");
+    const escapedDuplicatePath = join(directory, "escaped-duplicate.json");
+    const surrogatePath = join(directory, "surrogate.json");
+    writeFileSync(duplicatePath, '{"scope":"deny","scope":"allow"}\n', "utf8");
+    writeFileSync(
+      escapedDuplicatePath,
+      '{"\\u0073cope":"deny","scope":"allow"}\n',
+      "utf8"
+    );
+    writeFileSync(surrogatePath, '{"value":"\\ud800"}\n', "utf8");
+    expect(() => readDocument(duplicatePath)).toThrow("unique object member names");
+    expect(() => readDocument(escapedDuplicatePath)).toThrow("unique object member names");
+    expect(() => readDocument(surrogatePath)).toThrow("lone Unicode surrogates");
   });
 });

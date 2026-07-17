@@ -1,4 +1,7 @@
 export const API_VERSION = "agenticstrata.dev/v1" as const;
+export const EVALUATOR_NAME = "agentic-strata" as const;
+export const EVALUATOR_VERSION = "0.1.0-alpha.1" as const;
+export const EVALUATOR_REVISION = "conformance-2026-07-17.3" as const;
 
 export const STRATA = [
   "interaction",
@@ -63,6 +66,7 @@ export interface RuntimeBoundaryEvidence {
   networkEgressObserved: boolean;
   endpointDigest: Digest;
   producer: string;
+  observationStartedAt: string;
   observedAt: string;
   digest: Digest;
 }
@@ -160,6 +164,12 @@ export interface OutcomeContract {
     id: string;
     assertion: string;
     evidenceRequired: boolean;
+    evidenceRequirements: Array<{
+      kind: "artifact-attestation";
+      capabilityId: string;
+      subjectDigest: Digest;
+      evidenceRole: "observed-result" | "compensation-result";
+    }>;
   }>;
   forbiddenOutcomes: string[];
   digest: Digest;
@@ -298,6 +308,7 @@ export interface ArtifactAttestation {
   artifactDigest: Digest;
   capabilityId?: string;
   subjectDigest?: Digest;
+  evidenceRole?: "prepared-action" | "observed-result" | "compensation-result" | "generic";
   producer: string;
   createdAt: string;
   provenanceRefs: EvidenceRef[];
@@ -350,6 +361,12 @@ export interface ConformanceReport {
   profile: ConformanceProfile;
   status: "pass" | "fail";
   runStatus: "completed" | "failed" | "incomplete";
+  evaluator: {
+    name: typeof EVALUATOR_NAME;
+    version: typeof EVALUATOR_VERSION;
+    revision: typeof EVALUATOR_REVISION;
+    digest: Digest;
+  };
   manifestDigest: Digest;
   runBundleDigest: Digest;
   profileConfigurationDigest: Digest;
