@@ -78,6 +78,31 @@ if (hasHistory) {
       throw new Error(`Tag ${ref ?? "unknown"} does not use the canonical personal identity.`);
     }
   }
+
+  const reachableObjects = git(["rev-list", "--objects", "--all"])
+    .split("\n")
+    .filter(Boolean);
+  const visited = new Set();
+  for (const row of reachableObjects) {
+    const separator = row.indexOf(" ");
+    const objectId = separator === -1 ? row : row.slice(0, separator);
+    const path = separator === -1 ? "" : row.slice(separator + 1);
+    if (path !== "") {
+      assertClean(`historical path ${path}`, path);
+    }
+    if (visited.has(objectId) || git(["cat-file", "-t", objectId]).trim() !== "blob") {
+      continue;
+    }
+    visited.add(objectId);
+    const size = Number.parseInt(git(["cat-file", "-s", objectId]).trim(), 10);
+    if (!Number.isSafeInteger(size) || size > 16 * 1024 * 1024) {
+      continue;
+    }
+    const content = git(["cat-file", "blob", objectId], { encoding: "buffer" });
+    if (!content.includes(0)) {
+      assertClean(`historical blob ${objectId}`, content.toString("utf8"));
+    }
+  }
 }
 
 console.log(
@@ -85,6 +110,7 @@ console.log(
     {
       filesScanned: files.length,
       historyScanned: hasHistory,
+      historyBlobsScanned: hasHistory ? "all reachable text blobs up to 16 MiB" : "none",
       canonicalIdentity: `${canonicalName} <${canonicalEmail}>`
     },
     null,

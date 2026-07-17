@@ -38,11 +38,26 @@ try {
     'import { runConformance, runDemo } from "agentic-strata";',
     'const result = runDemo();',
     'const report = runConformance(result.bundle, "enterprise");',
-    'if (report.status !== "pass" || result.readBack !== true) process.exit(2);',
-    'console.log(JSON.stringify({ status: report.status, readBack: result.readBack }));'
+    'if (report.status !== "pass" || report.runStatus !== "completed" || result.readBack !== true) process.exit(2);',
+    'console.log(JSON.stringify({ status: report.status, runStatus: report.runStatus, readBack: result.readBack }));'
   ].join("\n");
   const output = run(process.execPath, ["--input-type=module", "--eval", probe], temporary);
   process.stdout.write(output);
+
+  const executable = join(
+    temporary,
+    "node_modules",
+    ".bin",
+    process.platform === "win32" ? "agentic-strata.cmd" : "agentic-strata"
+  );
+  const version = run(executable, ["--version"], temporary).trim();
+  if (version !== "0.1.0-alpha.1") {
+    throw new Error(`Installed CLI reported unexpected version: ${version}`);
+  }
+  const cliOutput = join(temporary, "cli-demo");
+  run(executable, ["demo", "--output", cliOutput, "--profile", "enterprise"], temporary);
+  run(executable, ["validate", join(cliOutput, "run.bundle.json")], temporary);
+  console.log(JSON.stringify({ cliVersion: version, cliDemo: "pass" }));
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }
