@@ -1,6 +1,6 @@
 {
   "name": "agentic-strata",
-  "version": "0.1.0-alpha.1",
+  "version": "0.2.0-alpha.1",
   "description": "Executable, contract-first reference architecture for enterprise agentic applications.",
   "type": "module",
   "license": "Apache-2.0",

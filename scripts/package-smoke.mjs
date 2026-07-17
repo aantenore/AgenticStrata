@@ -52,7 +52,7 @@ try {
     process.platform === "win32" ? "agentic-strata.cmd" : "agentic-strata"
   );
   const version = run(executable, ["--version"], temporary).trim();
-  if (version !== "0.1.0-alpha.1") {
+  if (version !== "0.2.0-alpha.1") {
     throw new Error(`Installed CLI reported unexpected version: ${version}`);
   }
   const cliOutput = join(temporary, "cli-demo");

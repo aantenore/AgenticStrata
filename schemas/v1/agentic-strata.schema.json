@@ -1045,7 +1045,7 @@
           "additionalProperties": false,
           "properties": {
             "name": { "type": "string", "const": "agentic-strata" },
-            "version": { "type": "string", "const": "0.1.0-alpha.1" },
+            "version": { "type": "string", "const": "0.2.0-alpha.1" },
             "revision": {
               "type": "string",
               "const": "conformance-2026-07-17.3"
