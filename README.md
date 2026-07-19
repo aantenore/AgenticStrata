@@ -1,8 +1,46 @@
 # AgenticStrata
 
-AgenticStrata is an executable reference architecture for enterprise agentic applications. It defines application-level runtime contracts, tamper-evident receipts, and conformance profiles without prescribing a model, agent framework, cloud, database, or deployment topology.
+**Make every agent action understandable, checkable, and reconstructable.**
 
-The architecture is intentionally more than a layer diagram. A run can be validated, replayed, explained to a non-specialist, and checked against evidence produced by the actual capability lifecycle.
+## In plain English
+
+- **Problem:** an AI agent can say that a task is complete while leaving people
+  unable to prove what was requested, what it was allowed to do, what changed,
+  or which checks passed.
+- **What it does:** AgenticStrata provides vendor-neutral contracts and receipts
+  that turn one agent run into a structured, verifiable record. It is the
+  architectural and evidence layer around an agent application, not the agent
+  framework or model itself.
+- **Who it is for:** teams building enterprise agent applications that must be
+  understandable to product owners, operators, auditors, and engineers.
+- **Concrete example:** the included generic-change flow prepares one
+  configuration change, binds it to an approval, applies it once, reads the
+  result back, and records the evidence. The CLI can then explain the run in
+  plain language or show exactly which required check failed.
+
+| Feature | Real-world benefit |
+| --- | --- |
+| Seven responsibility layers | Teams can change models, tools, or infrastructure without mixing business intent with permissions and execution. |
+| Typed intent, outcome, authority, and capability contracts | Everyone can see what success meant and which actions were actually permitted. |
+| Linked run receipts and reconstruction | A reviewer can rebuild the run and detect missing or modified supplied evidence. |
+| Prepare, commit, verify, and compensate lifecycle | Side effects become explicit, approval-aware, and checkable instead of hidden inside an agent loop. |
+| Configurable conformance profiles | The same application can apply stricter evidence rules to enterprise, regulated, local, or distributed runs. |
+| Plain-language explanation and Execution Passport | Technical run evidence can be shared with non-specialists and bound to external attestations without embedding the full payload. |
+
+> **Maturity and limits:** this is an executable alpha reference architecture,
+> not a hosted agent platform or regulatory certification. Digital fingerprints
+> detect changed or missing supplied evidence but do not identify its author
+> without an external signature or trusted store. The project records the meaning
+> supplied to it; it cannot guarantee that an earlier normalization step
+> understood the user's words correctly.
+
+## Technical overview
+
+AgenticStrata defines application-level runtime contracts, tamper-evident
+receipts, and conformance profiles without prescribing a model, agent framework,
+cloud, database, or deployment topology. It is intentionally more than a layer
+diagram: a run can be validated, replayed, explained to a non-specialist, and
+checked against evidence produced by the actual capability lifecycle.
 
 ## The seven strata
 
