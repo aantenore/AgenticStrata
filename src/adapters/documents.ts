@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, extname } from "node:path";
+import { TextDecoder } from "node:util";
 
 import { parse, parseDocument } from "yaml";
 
@@ -7,7 +8,7 @@ import { canonicalize } from "../core/canonical.js";
 
 export const MAX_DOCUMENT_BYTES = 16 * 1024 * 1024;
 
-export function readDocument(path: string): unknown {
+function readSource(path: string): string {
   const metadata = statSync(path);
   if (!metadata.isFile()) {
     throw new Error("Contract input must be a regular file.");
@@ -15,14 +16,18 @@ export function readDocument(path: string): unknown {
   if (metadata.size > MAX_DOCUMENT_BYTES) {
     throw new Error(`Contract input exceeds the ${MAX_DOCUMENT_BYTES}-byte limit.`);
   }
-  const source = readFileSync(path, "utf8");
-  const extension = extname(path).toLowerCase();
-  if (extension === ".yaml" || extension === ".yml") {
-    const value = parse(source, { maxAliasCount: 100, strict: true }) as unknown;
-    canonicalize(value);
-    return value;
+  const bytes = readFileSync(path);
+  if (bytes.byteLength > MAX_DOCUMENT_BYTES) {
+    throw new Error(`Contract input exceeds the ${MAX_DOCUMENT_BYTES}-byte limit.`);
   }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new SyntaxError("Contract input must be valid UTF-8.");
+  }
+}
 
+function parseStrictJson(source: string): unknown {
   const value = JSON.parse(source) as unknown;
   const duplicateCheck = parseDocument(source, {
     schema: "json",
@@ -37,6 +42,31 @@ export function readDocument(path: string): unknown {
   }
   canonicalize(value);
   return value;
+}
+
+export interface JsonDocumentWithSource {
+  document: unknown;
+  source: string;
+}
+
+export function readJsonDocumentWithSource(path: string): JsonDocumentWithSource {
+  const extension = extname(path).toLowerCase();
+  if (extension === ".yaml" || extension === ".yml") {
+    throw new Error("This input must be a JSON file.");
+  }
+  const source = readSource(path);
+  return { document: parseStrictJson(source), source };
+}
+
+export function readDocument(path: string): unknown {
+  const source = readSource(path);
+  const extension = extname(path).toLowerCase();
+  if (extension === ".yaml" || extension === ".yml") {
+    const value = parse(source, { maxAliasCount: 100, strict: true }) as unknown;
+    canonicalize(value);
+    return value;
+  }
+  return parseStrictJson(source);
 }
 
 export function writeJson(path: string, value: unknown): void {

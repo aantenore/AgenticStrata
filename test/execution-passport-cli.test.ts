@@ -17,8 +17,12 @@ import type { ExecutionEvidenceBinding } from "../src/index.js";
 
 function evidenceBinding(): ExecutionEvidenceBinding {
   return {
+    contractType: "ExecutionEvidenceBinding",
     role: "execution-placement",
     producer: "placement-provider",
+    runIdDigest: digestValue("run-change-demo-001"),
+    observedAt: "2026-07-17T11:59:59.000Z",
+    authority: "observation-only",
     resource: {
       name: "execution-placement-evidence",
       digest: { sha256: digestValue({ contentFreeFixture: true }) },
@@ -118,7 +122,7 @@ describe("passport CLI", () => {
           ],
           { from: "user" }
         )
-      ).rejects.toThrow("not a content-free ExecutionEvidenceBinding");
+      ).rejects.toThrow("not a valid v2 content-free ExecutionEvidenceBinding");
     } finally {
       process.exitCode = previousExitCode;
       errorOutput.mockRestore();

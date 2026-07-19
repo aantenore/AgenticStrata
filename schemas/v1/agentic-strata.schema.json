@@ -20,6 +20,7 @@
     { "$ref": "#/$defs/ArtifactAttestation" },
     { "$ref": "#/$defs/TraceEvent" },
     { "$ref": "#/$defs/ConformanceReport" },
+    { "$ref": "#/$defs/ExecutionEvidenceBinding" },
     { "$ref": "#/$defs/ExecutionPassport" },
     { "$ref": "#/$defs/AdapterMapping" },
     { "$ref": "#/$defs/RunBundle" }
@@ -75,12 +76,25 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "contractType": { "type": "string", "const": "ExecutionEvidenceBinding" },
         "role": { "type": "string", "const": "execution-placement" },
         "producer": { "$ref": "#/$defs/Identifier" },
+        "runIdDigest": { "$ref": "#/$defs/Digest" },
+        "observedAt": { "type": "string", "format": "date-time" },
+        "authority": { "type": "string", "const": "observation-only" },
         "resource": { "$ref": "#/$defs/ResourceDescriptor" },
         "disclosure": { "type": "string", "const": "content-free" }
       },
-      "required": ["role", "producer", "resource", "disclosure"]
+      "required": [
+        "contractType",
+        "role",
+        "producer",
+        "runIdDigest",
+        "observedAt",
+        "authority",
+        "resource",
+        "disclosure"
+      ]
     },
     "Identifier": {
       "type": "string",
@@ -1055,10 +1069,10 @@
           "additionalProperties": false,
           "properties": {
             "name": { "type": "string", "const": "agentic-strata" },
-            "version": { "type": "string", "const": "0.2.0-alpha.1" },
+            "version": { "type": "string", "const": "0.3.0-alpha.1" },
             "revision": {
               "type": "string",
-              "const": "conformance-2026-07-17.3"
+              "const": "conformance-2026-07-19.1"
             },
             "digest": { "$ref": "#/$defs/Digest" }
           },
@@ -1193,7 +1207,7 @@
         },
         "predicateType": {
           "type": "string",
-          "const": "https://github.com/aantenore/AgenticStrata/tree/main/docs/spec/attestations/execution-passport/v1"
+          "const": "https://github.com/aantenore/AgenticStrata/tree/main/docs/spec/attestations/execution-passport/v2"
         },
         "predicate": { "$ref": "#/$defs/ExecutionPassportPredicate" }
       },

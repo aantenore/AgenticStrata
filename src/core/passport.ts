@@ -60,7 +60,8 @@ function copyResourceDescriptor(resource: ResourceDescriptor): ResourceDescripto
 }
 
 function copyExecutionEvidence(
-  bindings: readonly ExecutionEvidenceBinding[]
+  bindings: readonly ExecutionEvidenceBinding[],
+  expectedRunIdDigest: string
 ): ExecutionEvidenceBinding[] {
   const seenDigests = new Set<string>();
   return bindings.map((binding, index) => {
@@ -72,10 +73,17 @@ function copyExecutionEvidence(
     if (seenDigests.has(digest)) {
       throw new Error(`Execution evidence digest ${digest} is duplicated.`);
     }
+    if (binding.runIdDigest !== expectedRunIdDigest) {
+      throw new Error(`Execution evidence binding ${index} belongs to a different run.`);
+    }
     seenDigests.add(digest);
     return {
+      contractType: binding.contractType,
       role: binding.role,
       producer: binding.producer,
+      runIdDigest: binding.runIdDigest,
+      observedAt: binding.observedAt,
+      authority: binding.authority,
       resource: copyResourceDescriptor(binding.resource),
       disclosure: binding.disclosure
     };
@@ -170,7 +178,10 @@ interface ObservedTimestamp {
   value: string;
 }
 
-function observedTimestamps(bundle: RunBundle): ObservedTimestamp[] {
+function observedTimestamps(
+  bundle: RunBundle,
+  executionEvidence: readonly ExecutionEvidenceBinding[]
+): ObservedTimestamp[] {
   return [
     { label: "budget usage", value: bundle.budgetUsage.observedAt },
     ...bundle.traceEvents.map((event) => ({
@@ -196,19 +207,24 @@ function observedTimestamps(bundle: RunBundle): ObservedTimestamp[] {
     ...bundle.approvals.map((approval) => ({
       label: `approval ${approval.approvalId}`,
       value: approval.issuedAt
+    })),
+    ...executionEvidence.map((evidence, index) => ({
+      label: `execution evidence ${index} from ${evidence.producer}`,
+      value: evidence.observedAt
     }))
   ];
 }
 
 function requireReportAfterObservedEvidence(
   bundle: RunBundle,
-  report: ConformanceReport
+  report: ConformanceReport,
+  executionEvidence: readonly ExecutionEvidenceBinding[]
 ): void {
   const reportMillis = Date.parse(report.generatedAt);
   if (!Number.isFinite(reportMillis)) {
     throw new Error("ConformanceReport generatedAt must be a valid date-time.");
   }
-  for (const observed of observedTimestamps(bundle)) {
+  for (const observed of observedTimestamps(bundle, executionEvidence)) {
     const observedMillis = Date.parse(observed.value);
     if (!Number.isFinite(observedMillis)) {
       throw new Error(`${observed.label} must have a valid observed date-time.`);
@@ -234,10 +250,14 @@ export function createExecutionPassport(
   input: CreateExecutionPassportInput
 ): ExecutionPassport {
   requireBoundReport(input.bundle, input.report);
-  requireReportAfterObservedEvidence(input.bundle, input.report);
   requireOpaqueJsonRecord(input.oasfRecord);
 
   const runId = requireConsistentRunIdentity(input.bundle);
+  const executionEvidence = copyExecutionEvidence(
+    input.executionEvidence ?? [],
+    digestValue(runId)
+  );
+  requireReportAfterObservedEvidence(input.bundle, input.report, executionEvidence);
   const terminalReceiptDigest = terminalBinding(input.bundle, input.report);
   const issuedAt = input.issuedAt ?? new Date().toISOString();
   requireIssuedAt(issuedAt, input.report);
@@ -281,7 +301,7 @@ export function createExecutionPassport(
       evaluatorDigest: input.report.evaluator.digest,
       terminalReceiptDigest,
       issuedAt,
-      executionEvidence: copyExecutionEvidence(input.executionEvidence ?? [])
+      executionEvidence
     }
   };
 

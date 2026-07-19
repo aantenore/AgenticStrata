@@ -37,8 +37,8 @@ Logical strata may share one process. The rule is a dependency and responsibilit
 - A composite cache fingerprint that requires both semantic and operational equivalence: policy, capability set, authoritative context, tenant, privacy, constraints, and outcome are all bound.
 - An RFC 8785 JSON Canonicalization Scheme implementation with cross-language golden vectors, strict duplicate-member rejection at the JSON boundary, and a hash-linked receipt chain with tamper and missing-evidence detection.
 - Runtime conformance checks for rooted authority, causal evidence, actual budget consumption, exact-action idempotency, approval, read-back or compensation, predeclared criterion evidence bindings, layer direction, and model/authority separation.
-- An [Execution Passport](docs/spec/attestations/execution-passport/v1/README.md) that binds one run bundle, its complete conformance report, and one externally validated OASF record in a strict in-toto Statement without embedding those documents.
-- Mapping-only adapter documents for AG-UI, A2A, MCP, OpenTelemetry GenAI, CloudEvents, an external policy engine, OASF, and content-free execution-placement evidence.
+- An [Execution Passport v2](docs/spec/attestations/execution-passport/v2/README.md) that binds one run bundle, its complete conformance report, one externally validated OASF record, and optional run-bound observations in a strict in-toto Statement without embedding those documents.
+- Mapping-only adapter documents for AG-UI, A2A, MCP, OpenTelemetry GenAI, CloudEvents, an external policy engine, and OASF, plus an executable StageFabric evidence-reduction adapter.
 - A neutral prepare/commit/read-back demo with exact-action approval and duplicate suppression.
 
 ## Quick start
@@ -72,7 +72,23 @@ node dist/cli.js passport .tmp/demo/run.bundle.json \
 node dist/cli.js validate .tmp/demo/execution-passport.json
 ```
 
-The output file contains exact RFC 8785 Statement bytes suitable for an external DSSE/Sigstore adapter. Repeat `--execution-evidence` only with strict `ExecutionEvidenceBinding` documents containing descriptors and digests, never provider output.
+When StageFabric produces a sealed content-free placement artifact, reduce it to a run-bound descriptor before Passport creation:
+
+```bash
+node dist/cli.js bind-stagefabric /path/to/stagefabric-evidence.json \
+  --uri urn:stagefabric:evidence:run-001 \
+  --output .tmp/demo/stagefabric-binding.json
+node dist/cli.js passport .tmp/demo/run.bundle.json \
+  --report .tmp/demo/conformance-report.json \
+  --oasf-record /path/to/validated-oasf-record.json \
+  --oasf-media-type "$OASF_MEDIA_TYPE" \
+  --execution-evidence .tmp/demo/stagefabric-binding.json \
+  --output .tmp/demo/execution-passport.json
+```
+
+The output file contains exact RFC 8785 Statement bytes suitable for an external DSSE/Sigstore adapter. Repeat `--execution-evidence` only with strict v2 bindings whose `runIdDigest` matches the Passport run and whose authority is fixed to `observation-only`.
+
+`bind-stagefabric` accepts only the exact canonical JSON plus trailing LF emitted by the StageFabric evidence writer. Pretty-printed JSON, YAML, or a reserialized object is rejected because the resulting descriptor digest identifies the retrievable file bytes, not merely an equivalent object.
 
 All commands accept JSON; `validate` and `lint` also accept YAML. Build once with `npm run build` before invoking the repository-local CLI. Input documents are bounded to 16 MiB, JSON member names must be unique, and YAML alias expansion is limited.
 
@@ -115,7 +131,7 @@ Read [Architecture](docs/architecture.md), [Contracts and conformance](docs/cont
 - Reports bind the evaluator name, package version, semantic revision, selected rule set, and effective profile configuration. The evaluator digest identifies the declared implementation revision; it is not a code signature.
 - An unsigned Execution Passport proves deterministic integrity and cross-artifact binding only. Authenticity requires an externally verified DSSE envelope or equivalent trusted channel, and consumers must make that requirement explicit so removing a signature cannot silently downgrade policy.
 - The OASF subject digest proves which opaque record was bound; it does not prove that the record is semantically valid OASF. Validate it before passport creation with the specification owner’s tooling.
-- Execution-placement evidence enters the predicate only as strict descriptors with no payload or `content` field. Descriptor metadata must come from a trusted producer and be redacted or pseudonymized when sensitive; its optional stable URI may be omitted. Full provider result objects are outside the Passport contract.
+- Execution-placement evidence enters the predicate only as a strict, run-bound, observation-only descriptor with a normalized observation time and no payload or `content` field. A StageFabric descriptor hashes the exact canonical JSON file bytes, including its trailing LF. Descriptor metadata must come from a trusted producer and be redacted or pseudonymized when sensitive; its optional stable URI may be omitted. Full provider result objects are outside the Passport contract.
 - A safe fingerprint binds the declared canonical intent. It does not prove that an upstream intent normalizer chose the correct meaning.
 - Adapter documents are integration contracts, not bundled protocol SDKs or policy engines.
 - The current release is an alpha contract surface. Version consumers explicitly before production adoption.
@@ -126,6 +142,6 @@ Read [Architecture](docs/architecture.md), [Contracts and conformance](docs/cont
 npm run release:check
 ```
 
-The release gate runs strict lint and types, 60+ tests with coverage thresholds, build, repository hygiene, production audit, `publint`, and Are the Types Wrong.
+The release gate runs strict lint and types, 80+ tests with coverage thresholds, build, repository hygiene, production audit, `publint`, and Are the Types Wrong.
 
 Apache-2.0 licensed. See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).

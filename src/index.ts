@@ -1,5 +1,6 @@
 export * from "./contracts/types.js";
 export * from "./contracts/registry.js";
+export * from "./adapters/stagefabric-evidence.js";
 export * from "./conformance/config.js";
 export * from "./conformance/engine.js";
 export * from "./conformance/manifest.js";

@@ -1,6 +1,8 @@
 # AgenticStrata Execution Passport v1
 
-Status: alpha, versioned contract
+Status: superseded historical contract
+
+New producers must use [Execution Passport v2](../v2/README.md). V1 execution-evidence descriptors did not bind the observed run and must not be promoted by changing only the predicate URI. This document is retained for migration analysis; `validate` retains read-only v1 Statement support while the current creation schema and builder implement v2.
 
 Predicate type:
 
@@ -10,7 +12,7 @@ Predicate type:
 
 Execution Passport v1 is an in-toto Statement that binds one runtime bundle, the complete conformance report produced for that bundle, and one external OASF agent record. It packages lineage; it is not a success certificate, an OASF validator, a digital signature, or a trusted timestamp.
 
-The normative machine-readable shape is `$defs.ExecutionPassport` in [`schemas/v1/agentic-strata.schema.json`](../../../../../schemas/v1/agentic-strata.schema.json).
+The historical shape is described here. The current `$defs.ExecutionPassport` in [`schemas/v1/agentic-strata.schema.json`](../../../../../schemas/v1/agentic-strata.schema.json) implements v2.
 
 ## Statement envelope
 

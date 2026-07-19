@@ -4,10 +4,15 @@ import { Command, InvalidArgumentError } from "commander";
 
 import {
   readDocument,
+  readJsonDocumentWithSource,
   writeCanonicalJson,
   writeJson,
   writeText
 } from "./adapters/documents.js";
+import {
+  createStageFabricExecutionEvidenceBinding,
+  requireStageFabricExecutionPlacementArtifactEncoding
+} from "./adapters/stagefabric-evidence.js";
 import { validateAs, validateDocument } from "./contracts/registry.js";
 import { CONFORMANCE_PROFILES, EVALUATOR_VERSION } from "./contracts/types.js";
 import type {
@@ -74,7 +79,7 @@ function requireExecutionEvidence(path: string): ExecutionEvidenceBinding {
   const validation = validateAs("ExecutionEvidenceBinding", document);
   if (!validation.valid) {
     printValidation(validation);
-    throw new Error("The input is not a content-free ExecutionEvidenceBinding.");
+    throw new Error("The input is not a valid v2 content-free ExecutionEvidenceBinding.");
   }
   return document as ExecutionEvidenceBinding;
 }
@@ -145,6 +150,31 @@ export function createCliProgram(): Command {
         }
       }
     );
+
+  program
+    .command("bind-stagefabric")
+    .description(
+      "Validate sealed StageFabric placement evidence and emit an observation-only passport binding."
+    )
+    .argument("<evidence>")
+    .option("--uri <uri>", "stable HTTPS or URN reference to the evidence artifact")
+    .option("-o, --output <file>", "write exact canonical binding bytes")
+    .action((file: string, options: { uri?: string; output?: string }) => {
+      const source = readJsonDocumentWithSource(resolve(file));
+      requireStageFabricExecutionPlacementArtifactEncoding(
+        source.document,
+        source.source
+      );
+      const binding = createStageFabricExecutionEvidenceBinding(
+        source.document,
+        options.uri === undefined ? {} : { uri: options.uri }
+      );
+      if (options.output === undefined) {
+        process.stdout.write(canonicalize(binding));
+      } else {
+        writeCanonicalJson(resolve(options.output), binding);
+      }
+    });
 
   program
     .command("passport")

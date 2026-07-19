@@ -1,6 +1,6 @@
 # ADR 0004: Execution Passport as a strict external attestation statement
 
-Status: accepted
+Status: accepted for v1; superseded by ADR 0005 for new Passport evidence
 
 ## Context
 
