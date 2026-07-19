@@ -122,9 +122,20 @@ node dist/cli.js passport .tmp/demo/run.bundle.json \
   --oasf-media-type "$OASF_MEDIA_TYPE" \
   --execution-evidence .tmp/demo/stagefabric-binding.json \
   --output .tmp/demo/execution-passport.json
+node dist/cli.js verify-passport .tmp/demo/execution-passport.json \
+  --bundle .tmp/demo/run.bundle.json \
+  --report .tmp/demo/conformance-report.json \
+  --oasf-record /path/to/validated-oasf-record.json \
+  --execution-evidence-resource /path/to/stagefabric-evidence.json
 ```
 
-The output file contains exact RFC 8785 Statement bytes suitable for an external DSSE/Sigstore adapter. Repeat `--execution-evidence` only with strict v2 bindings whose `runIdDigest` matches the Passport run and whose authority is fixed to `observation-only`.
+`passport` writes exact RFC 8785 Statement bytes suitable for an external
+DSSE/Sigstore adapter. `verify-passport` is the consumer-side check: it rebuilds
+the expected subject and predicate bindings from the supplied bundle, report,
+and OASF record, then requires the exact bytes of every referenced execution
+artifact. It proves internal consistency, not signer authenticity or OASF
+semantics. Repeat `--execution-evidence` and
+`--execution-evidence-resource` once per corresponding binding and artifact.
 
 `bind-stagefabric` accepts only the exact canonical JSON plus trailing LF emitted by the StageFabric evidence writer. Pretty-printed JSON, YAML, or a reserialized object is rejected because the resulting descriptor digest identifies the retrievable file bytes, not merely an equivalent object.
 
@@ -168,6 +179,7 @@ Read [Architecture](docs/architecture.md), [Contracts and conformance](docs/cont
 - Run status and conformance status are separate: a failed run can still have an intact, conformant evidence record, but it is never explained as a completed outcome.
 - Reports bind the evaluator name, package version, semantic revision, selected rule set, and effective profile configuration. The evaluator digest identifies the declared implementation revision; it is not a code signature.
 - An unsigned Execution Passport proves deterministic integrity and cross-artifact binding only. Authenticity requires an externally verified DSSE envelope or equivalent trusted channel, and consumers must make that requirement explicit so removing a signature cannot silently downgrade policy.
+- Consumer verification requires the complete supplied subject set and exact bytes for every execution-evidence resource; validating the Passport schema alone does not verify those bindings.
 - The OASF subject digest proves which opaque record was bound; it does not prove that the record is semantically valid OASF. Validate it before passport creation with the specification owner’s tooling.
 - Execution-placement evidence enters the predicate only as a strict, run-bound, observation-only descriptor with a normalized observation time and no payload or `content` field. A StageFabric descriptor hashes the exact canonical JSON file bytes, including its trailing LF. Descriptor metadata must come from a trusted producer and be redacted or pseudonymized when sensitive; its optional stable URI may be omitted. Full provider result objects are outside the Passport contract.
 - The StageFabric adapter follows its finalized `0.7.0-alpha.1` successful-run contract: trace events are either completed placements or pre-output retries with status `429`, `502`, `503`, or `504`. Terminal failures, arbitrary HTTP codes, missing retry codes, and codes attached to completed events fail closed.

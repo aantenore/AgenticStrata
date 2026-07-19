@@ -5,6 +5,7 @@ import { Command, InvalidArgumentError } from "commander";
 import {
   readDocument,
   readJsonDocumentWithSource,
+  readResourceBytes,
   writeCanonicalJson,
   writeJson,
   writeText
@@ -20,6 +21,7 @@ import type {
   ConformanceProfile,
   ConformanceReport,
   ExecutionEvidenceBinding,
+  ExecutionPassport,
   RunBundle,
   ValidationResult
 } from "./contracts/types.js";
@@ -28,7 +30,7 @@ import { reportIssues, runConformance } from "./conformance/engine.js";
 import { lintManifest } from "./conformance/manifest.js";
 import { canonicalize } from "./core/canonical.js";
 import { explainRun } from "./core/explain.js";
-import { createExecutionPassport } from "./core/passport.js";
+import { createExecutionPassport, verifyExecutionPassport } from "./core/passport.js";
 import { evidenceIndex, verifyTraceChain } from "./core/receipts.js";
 import { runDemo } from "./demo/demo.js";
 
@@ -82,6 +84,16 @@ function requireExecutionEvidence(path: string): ExecutionEvidenceBinding {
     throw new Error("The input is not a valid v2 content-free ExecutionEvidenceBinding.");
   }
   return document as ExecutionEvidenceBinding;
+}
+
+function requirePassport(path: string): ExecutionPassport {
+  const document = readDocument(path);
+  const validation = validateAs("ExecutionPassport", document);
+  if (!validation.valid) {
+    printValidation(validation);
+    throw new Error("The input is not a valid Execution Passport v2.");
+  }
+  return document as ExecutionPassport;
 }
 
 interface PassportCommandOptions {
@@ -218,6 +230,47 @@ export function createCliProgram(): Command {
         writeCanonicalJson(resolve(options.output), passport);
       }
     });
+
+  program
+    .command("verify-passport")
+    .description(
+      "Verify an unsigned Passport against its complete subjects and execution-evidence files."
+    )
+    .argument("<passport>")
+    .requiredOption("--bundle <file>", "RunBundle subject")
+    .requiredOption("--report <file>", "ConformanceReport subject")
+    .requiredOption("--oasf-record <file>", "opaque OASF record subject")
+    .option(
+      "--execution-evidence-resource <file>",
+      "complete evidence artifact referenced by the Passport; repeat for multiple resources",
+      collectPath,
+      []
+    )
+    .action(
+      (
+        file: string,
+        options: {
+          bundle: string;
+          report: string;
+          oasfRecord: string;
+          executionEvidenceResource: string[];
+        }
+      ) => {
+        const result = verifyExecutionPassport({
+          passport: requirePassport(resolve(file)),
+          bundle: requireBundle(resolve(options.bundle)),
+          report: requireReport(resolve(options.report)),
+          oasfRecord: readDocument(resolve(options.oasfRecord)),
+          executionEvidenceResources: options.executionEvidenceResource.map((path) =>
+            readResourceBytes(resolve(path))
+          )
+        });
+        console.log(JSON.stringify(result, null, 2));
+        if (!result.valid) {
+          process.exitCode = 2;
+        }
+      }
+    );
 
   program
     .command("replay")

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -33,8 +33,9 @@ function evidenceBinding(): ExecutionEvidenceBinding {
 }
 
 describe("passport CLI", () => {
-  it("writes exact canonical Statement bytes without embedding source documents or paths", async () => {
+  it("writes canonical Statement bytes and verifies the installed consumer artifact set", async () => {
     const directory = mkdtempSync(join(tmpdir(), "agentic-strata-passport-cli-"));
+    const logOutput = vi.spyOn(console, "log").mockImplementation(() => undefined);
     try {
       const bundle = runDemo().bundle;
       const report = runConformance(bundle, "enterprise", {
@@ -44,11 +45,13 @@ describe("passport CLI", () => {
       const reportPath = join(directory, "report.json");
       const oasfPath = join(directory, "external-oasf.json");
       const evidencePath = join(directory, "execution-evidence-binding.json");
+      const evidenceResourcePath = join(directory, "execution-placement-evidence.json");
       const outputPath = join(directory, "passport.json");
       writeJson(bundlePath, bundle);
       writeJson(reportPath, report);
       writeJson(oasfPath, { opaqueExternalRecord: "must-not-be-embedded" });
       writeJson(evidencePath, evidenceBinding());
+      writeFileSync(evidenceResourcePath, '{"contentFreeFixture":true}', "utf8");
 
       await createCliProgram().parseAsync(
         [
@@ -77,7 +80,32 @@ describe("passport CLI", () => {
       expect(raw).not.toContain("must-not-be-embedded");
       expect(raw).not.toContain(directory);
       expect(raw.endsWith("\n")).toBe(false);
+
+      await createCliProgram().parseAsync(
+        [
+          "verify-passport",
+          outputPath,
+          "--bundle",
+          bundlePath,
+          "--report",
+          reportPath,
+          "--oasf-record",
+          oasfPath,
+          "--execution-evidence-resource",
+          evidenceResourcePath
+        ],
+        { from: "user" }
+      );
+      const verification = JSON.parse(
+        String(logOutput.mock.calls.at(-1)?.[0])
+      ) as Record<string, unknown>;
+      expect(verification).toMatchObject({
+        valid: true,
+        verifiedSubjects: 3,
+        verifiedExecutionEvidenceResources: 1
+      });
     } finally {
+      logOutput.mockRestore();
       rmSync(directory, { recursive: true, force: true });
     }
   });

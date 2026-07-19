@@ -54,6 +54,15 @@ OASF input is accepted only as an opaque I-JSON object and canonicalized for its
 
 The Passport is created after assessment and is not required by a conformance rule. Making it a prerequisite of the report it contains would create a circular dependency.
 
+Consumer verification is a separate fail-closed operation. Given a v2 Passport,
+the complete run bundle, report, opaque OASF record, and every referenced
+execution-evidence file, `verifyExecutionPassport` reconstructs the expected
+Statement and compares all subject and predicate bindings. Evidence files are
+matched one-to-one by SHA-256 over their exact bytes; missing, duplicated, or
+unreferenced files fail verification. The CLI exposes the same operation as
+`verify-passport`. This verifies an unsigned artifact set, not producer identity,
+OASF semantics, trusted time, or an external DSSE envelope.
+
 ## Evidence, not file detection
 
 A conformance run consumes a `RunBundle`. It does not infer architecture from directory names, imports, or keywords. This avoids declaring success simply because a project contains a policy file or telemetry package. Conversely, a source scanner remains useful before runtime evidence exists; its result should be treated as a discovery signal rather than runtime proof.
