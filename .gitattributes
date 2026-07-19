@@ -1,0 +1,2 @@
+# Canonical JSON fixtures and lockfiles are byte-sensitive across platforms.
+*.json text eol=lf
