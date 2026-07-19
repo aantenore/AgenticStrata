@@ -103,6 +103,7 @@ describe("JSON and YAML document boundary", () => {
     const duplicatePath = join(directory, "duplicate.json");
     const escapedDuplicatePath = join(directory, "escaped-duplicate.json");
     const surrogatePath = join(directory, "surrogate.json");
+    const malformedUtf8Path = join(directory, "malformed-utf8.json");
     writeFileSync(duplicatePath, '{"scope":"deny","scope":"allow"}\n', "utf8");
     writeFileSync(
       escapedDuplicatePath,
@@ -110,8 +111,17 @@ describe("JSON and YAML document boundary", () => {
       "utf8"
     );
     writeFileSync(surrogatePath, '{"value":"\\ud800"}\n', "utf8");
+    writeFileSync(
+      malformedUtf8Path,
+      Buffer.from([
+        ...Buffer.from('{"value":"', "utf8"),
+        0x80,
+        ...Buffer.from('"}\n', "utf8")
+      ])
+    );
     expect(() => readDocument(duplicatePath)).toThrow("unique object member names");
     expect(() => readDocument(escapedDuplicatePath)).toThrow("unique object member names");
     expect(() => readDocument(surrogatePath)).toThrow("lone Unicode surrogates");
+    expect(() => readDocument(malformedUtf8Path)).toThrow("valid UTF-8");
   });
 });

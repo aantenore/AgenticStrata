@@ -78,7 +78,7 @@ Passport creation is a deterministic packaging step after conformance evaluation
 2. the canonical digest of the complete `ConformanceReport`, including its own `digest` field;
 3. the canonical digest of one opaque, externally validated OASF record.
 
-Optional execution-placement evidence is already reduced by its producer to a `ResourceDescriptor` with no payload or `content` field. AgenticStrata admits only the descriptor, producer identity, fixed role, and `content-free` disclosure marker; descriptor metadata must be trusted and redacted or pseudonymized when sensitive, and its URI may be omitted. It never consumes a provider’s full execution result through this boundary.
+Optional execution-placement evidence is reduced to a `ResourceDescriptor` with no payload or `content` field. AgenticStrata admits only the descriptor, producer identity, fixed role, canonical run-identifier digest, normalized observation time, `observation-only` authority, and `content-free` disclosure marker. A StageFabric adapter validates the source artifact, semantic trace, timestamp grammar, producer seal, and exact canonical-JSON-plus-LF writer bytes before reduction. Descriptor metadata must be trusted and redacted or pseudonymized when sensitive, and its URI may be omitted. A placement observation never grants authority; a descriptor from another run or after the report is rejected.
 
 The core emits an unsigned Statement. A replaceable external adapter may wrap its exact RFC 8785 bytes in DSSE and use Sigstore or another trust system. Signature verification, signer identity, transparency-log policy, and trusted time remain consumer-owned controls.
 

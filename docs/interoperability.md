@@ -12,13 +12,14 @@ AgenticStrata owns application-level runtime invariants. It deliberately leaves 
 | Policy engine | Grant, approval, attenuation query | The external enforcement point remains authoritative. |
 | OASF | Opaque agent-record subject descriptor | AgenticStrata binds canonical bytes but delegates semantic validation and media-type ownership. |
 | in-toto / DSSE | Execution Passport Statement and optional external envelope | The core owns deterministic binding; signing, identity, transparency, and trusted time stay outside it. |
-| Execution-placement provider | Content-free evidence descriptor | No payload or `content` field is admitted; descriptor metadata remains subject to producer trust, redaction, and pseudonymization policy. |
+| StageFabric | Sealed content-free placement artifact reduced to an evidence descriptor | Adapter verifies schema, seal, exact writer bytes, run binding, and observation time; the result is observation-only and cannot expand authority. |
+| Other execution-placement provider | Content-free, run-bound evidence descriptor | No payload or `content` field is admitted; producer validation remains an explicit adapter responsibility. |
 
 Adapter YAML files are declarative mappings with an explicit `lossPolicy`. They contain no vendor SDK and can be replaced without changing the core contract registry.
 
 ## Attestation exchange
 
-The Execution Passport uses the project-controlled predicate namespace documented at [`docs/spec/attestations/execution-passport/v1`](spec/attestations/execution-passport/v1/README.md). The core writes exact RFC 8785 Statement bytes. A deployment may pass those bytes to an external DSSE/Sigstore adapter using payload type `application/vnd.in-toto+json`; no signing key, certificate flow, or Sigstore dependency enters AgenticStrata.
+The Execution Passport uses the project-controlled predicate namespace documented at [`docs/spec/attestations/execution-passport/v2`](spec/attestations/execution-passport/v2/README.md). The core writes exact RFC 8785 Statement bytes. A deployment may pass those bytes to an external DSSE/Sigstore adapter using payload type `application/vnd.in-toto+json`; no signing key, certificate flow, or Sigstore dependency enters AgenticStrata.
 
 Consumers choose one of two explicit policies:
 

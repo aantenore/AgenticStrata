@@ -7,6 +7,7 @@ import type { FormatsPlugin } from "ajv-formats";
 
 import {
   EXECUTION_PASSPORT_PREDICATE_TYPE,
+  EXECUTION_PASSPORT_V1_PREDICATE_TYPE,
   IN_TOTO_STATEMENT_V1_TYPE,
   type CapabilityContract,
   type ContractType,
@@ -26,12 +27,68 @@ if (typeof rawSchemaId !== "string") {
 }
 const schemaId = rawSchemaId;
 
+function requireRecord(value: unknown, label: string): Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${label} must be an object.`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function createLegacyPassportSchema(): {
+  id: string;
+  schema: Record<string, unknown>;
+} {
+  const legacy = structuredClone(schema);
+  const id = `${schemaId}/execution-passport-v1`;
+  legacy.$id = id;
+  const definitions = requireRecord(legacy.$defs, "Schema definitions");
+  const binding = requireRecord(
+    definitions.ExecutionEvidenceBinding,
+    "ExecutionEvidenceBinding definition"
+  );
+  const bindingProperties = requireRecord(
+    binding.properties,
+    "ExecutionEvidenceBinding properties"
+  );
+  for (const property of ["contractType", "runIdDigest", "observedAt", "authority"]) {
+    Reflect.deleteProperty(bindingProperties, property);
+  }
+  if (!Array.isArray(binding.required)) {
+    throw new Error("ExecutionEvidenceBinding required fields must be an array.");
+  }
+  binding.required = binding.required.filter(
+    (field): field is string =>
+      typeof field === "string" &&
+      !["contractType", "runIdDigest", "observedAt", "authority"].includes(field)
+  );
+
+  const passport = requireRecord(
+    definitions.ExecutionPassport,
+    "ExecutionPassport definition"
+  );
+  const passportProperties = requireRecord(
+    passport.properties,
+    "ExecutionPassport properties"
+  );
+  const predicateType = requireRecord(
+    passportProperties.predicateType,
+    "ExecutionPassport predicateType"
+  );
+  predicateType.const = EXECUTION_PASSPORT_V1_PREDICATE_TYPE;
+  return { id, schema: legacy };
+}
+
 const ajv = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true });
 const addFormats = addFormatsImport as unknown as FormatsPlugin;
 addFormats(ajv);
 ajv.addSchema(schema, schemaId);
+const legacyPassportSchema = createLegacyPassportSchema();
+ajv.addSchema(legacyPassportSchema.schema, legacyPassportSchema.id);
 
 const validators = new Map<string, ValidateFunction>();
+const legacyPassportValidator = ajv.compile({
+  $ref: `${legacyPassportSchema.id}#/$defs/ExecutionPassport`
+});
 
 function validatorFor(schemaDefinition: SchemaDefinition): ValidateFunction {
   const cached = validators.get(schemaDefinition);
@@ -87,19 +144,26 @@ export function validateDocument(document: unknown): ValidationResult {
         ]
       };
     }
-    if (candidate.predicateType !== EXECUTION_PASSPORT_PREDICATE_TYPE) {
+    if (candidate.predicateType === EXECUTION_PASSPORT_PREDICATE_TYPE) {
+      return validateAs("ExecutionPassport", document);
+    }
+    if (candidate.predicateType === EXECUTION_PASSPORT_V1_PREDICATE_TYPE) {
+      const valid = legacyPassportValidator(document);
       return {
-        valid: false,
-        issues: [
-          {
-            path: "/predicateType",
-            code: "const",
-            message: "The in-toto predicate type is missing or unsupported."
-          }
-        ]
+        valid,
+        issues: valid ? [] : toIssues(legacyPassportValidator.errors)
       };
     }
-    return validateAs("ExecutionPassport", document);
+    return {
+      valid: false,
+      issues: [
+        {
+          path: "/predicateType",
+          code: "const",
+          message: "The in-toto predicate type is missing or unsupported."
+        }
+      ]
+    };
   }
 
   const contractType = candidate.contractType;
@@ -159,6 +223,7 @@ export const contractTypes = new Set<ContractType>([
   "ArtifactAttestation",
   "TraceEvent",
   "ConformanceReport",
+  "ExecutionEvidenceBinding",
   "AdapterMapping",
   "RunBundle"
 ]);

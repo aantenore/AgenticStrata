@@ -1,11 +1,13 @@
 export const API_VERSION = "agenticstrata.dev/v1" as const;
 export const EVALUATOR_NAME = "agentic-strata" as const;
-export const EVALUATOR_VERSION = "0.2.0-alpha.1" as const;
-export const EVALUATOR_REVISION = "conformance-2026-07-17.3" as const;
+export const EVALUATOR_VERSION = "0.3.0-alpha.1" as const;
+export const EVALUATOR_REVISION = "conformance-2026-07-19.1" as const;
 
 export const IN_TOTO_STATEMENT_V1_TYPE = "https://in-toto.io/Statement/v1" as const;
-export const EXECUTION_PASSPORT_PREDICATE_TYPE =
+export const EXECUTION_PASSPORT_V1_PREDICATE_TYPE =
   "https://github.com/aantenore/AgenticStrata/tree/main/docs/spec/attestations/execution-passport/v1" as const;
+export const EXECUTION_PASSPORT_PREDICATE_TYPE =
+  "https://github.com/aantenore/AgenticStrata/tree/main/docs/spec/attestations/execution-passport/v2" as const;
 export const EXECUTION_PASSPORT_SUBJECTS = {
   runBundle: "agentic-strata-run-bundle",
   conformanceReport: "agentic-strata-conformance-report",
@@ -413,8 +415,12 @@ export interface OasfRecordResourceDescriptor extends ResourceDescriptor {
 }
 
 export interface ExecutionEvidenceBinding {
+  contractType: "ExecutionEvidenceBinding";
   role: "execution-placement";
   producer: string;
+  runIdDigest: Digest;
+  observedAt: string;
+  authority: "observation-only";
   resource: ResourceDescriptor;
   disclosure: "content-free";
 }
@@ -504,13 +510,13 @@ export type ContractType =
   | ArtifactAttestation["contractType"]
   | TraceEvent["contractType"]
   | ConformanceReport["contractType"]
+  | ExecutionEvidenceBinding["contractType"]
   | AdapterMapping["contractType"]
   | RunBundle["contractType"];
 
 export type SchemaDefinition =
   | ContractType
   | "ResourceDescriptor"
-  | "ExecutionEvidenceBinding"
   | "ExecutionPassport";
 
 export interface ValidationIssue {

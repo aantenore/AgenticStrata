@@ -4,6 +4,7 @@ import {
   API_VERSION,
   EXECUTION_PASSPORT_PREDICATE_TYPE,
   EXECUTION_PASSPORT_SUBJECTS,
+  EXECUTION_PASSPORT_V1_PREDICATE_TYPE,
   appendTraceEvent,
   createExecutionPassport,
   digestValue,
@@ -49,10 +50,14 @@ function resealReport(
   return seal({ ...omitDigest(report), ...patch });
 }
 
-function contentFreeEvidence(): ExecutionEvidenceBinding {
+function contentFreeEvidence(runId = "run-change-demo-001"): ExecutionEvidenceBinding {
   return {
+    contractType: "ExecutionEvidenceBinding",
     role: "execution-placement",
     producer: "placement-provider",
+    runIdDigest: digestValue(runId),
+    observedAt: "2026-07-17T11:59:59.000Z",
+    authority: "observation-only",
     resource: {
       name: "execution-placement-evidence",
       digest: { sha256: digestValue({ opaqueEvidenceFixture: true }) },
@@ -102,6 +107,24 @@ describe("Execution Passport", () => {
     expect(passport.subject[2].digest.sha256).toBe(digestValue(oasfRecord));
     expect(validateAs("ExecutionPassport", passport)).toEqual({ valid: true, issues: [] });
     expect(validateDocument(passport)).toEqual({ valid: true, issues: [] });
+  });
+
+  it("retains read-only validation for archived v1 Passports", () => {
+    const bundle = runDemo().bundle;
+    const current = create(bundle, reportFor(bundle), {
+      executionEvidence: [contentFreeEvidence()]
+    });
+    const legacy = structuredClone(current) as unknown as Record<string, unknown>;
+    legacy.predicateType = EXECUTION_PASSPORT_V1_PREDICATE_TYPE;
+    const predicate = legacy.predicate as { executionEvidence: Record<string, unknown>[] };
+    for (const binding of predicate.executionEvidence) {
+      for (const field of ["contractType", "runIdDigest", "observedAt", "authority"]) {
+        Reflect.deleteProperty(binding, field);
+      }
+    }
+
+    expect(validateDocument(legacy)).toEqual({ valid: true, issues: [] });
+    expect(validateAs("ExecutionPassport", legacy).valid).toBe(false);
   });
 
   it("treats OASF as opaque canonical JSON rather than claiming semantic validity", () => {
@@ -176,6 +199,11 @@ describe("Execution Passport", () => {
     expect(() =>
       create(bundle, reportFor(bundle), { executionEvidence: [evidence, evidence] })
     ).toThrow("is duplicated");
+
+    const unrelated = contentFreeEvidence("unrelated-run");
+    expect(() =>
+      create(bundle, reportFor(bundle), { executionEvidence: [unrelated] })
+    ).toThrow("belongs to a different run");
   });
 
   it("rejects inline, credentialed, unstable, oversized, and local subject URIs", () => {

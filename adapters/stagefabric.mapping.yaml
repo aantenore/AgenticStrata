@@ -2,14 +2,14 @@ contractType: AdapterMapping
 apiVersion: agenticstrata.dev/v1
 mappingId: adapter/stagefabric
 protocol: stagefabric
-protocolVersion: configurable
+protocolVersion: v1alpha1
 direction: inbound
 contractBindings:
   - strataContract: ExecutionEvidenceBinding
-    protocolObject: ExecutionPlacementEvidence ResourceDescriptor
-    notes: Only role, producer, disclosure mode, resource name, canonical digest, media type, and an optional bounded stable HTTPS or URN reference are admitted; metadata must be trusted and redacted or pseudonymized when sensitive.
+    protocolObject: ExecutionPlacementEvidence
+    notes: The executable adapter validates strict source schema, semantic trace, timestamp grammar, seal, and exact canonical-JSON-plus-LF writer bytes; converts the prefixed run digest; normalizes observedAt; fixes authority to observation-only; and hashes the retrievable file bytes.
   - strataContract: ExecutionPassport
     protocolObject: predicate executionEvidence entry
-    notes: No payload or content field is admitted; the full provider result remains outside the mapping.
+    notes: Passport creation rejects a source from another run. No payload or content field is admitted, and placement never grants executable authority.
 lossPolicy: explicit-loss
 extensionPoint: true
