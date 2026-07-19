@@ -80,6 +80,12 @@ Passport creation is a deterministic packaging step after conformance evaluation
 
 Optional execution-placement evidence is reduced to a `ResourceDescriptor` with no payload or `content` field. AgenticStrata admits only the descriptor, producer identity, fixed role, canonical run-identifier digest, normalized observation time, `observation-only` authority, and `content-free` disclosure marker. A StageFabric adapter validates the source artifact, its successful-run-only trace (`completed` or a pre-output retry with `429`, `502`, `503`, or `504`), timestamp grammar, producer seal, and exact canonical-JSON-plus-LF writer bytes before reduction. Descriptor metadata must be trusted and redacted or pseudonymized when sensitive, and its URI may be omitted. A placement observation never grants authority; a descriptor from another run or after the report is rejected.
 
+The consumer path accepts the Passport together with all three subject documents
+and the exact bytes of every execution-evidence resource. It reconstructs the
+expected Statement, checks the complete bundle/report relationship again, and
+requires a one-to-one digest match for external evidence. Schema validation by
+itself is deliberately insufficient.
+
 The core emits an unsigned Statement. A replaceable external adapter may wrap its exact RFC 8785 bytes in DSSE and use Sigstore or another trust system. Signature verification, signer identity, transparency-log policy, and trusted time remain consumer-owned controls.
 
 ## Safe semantic caching

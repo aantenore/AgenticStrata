@@ -154,12 +154,38 @@ try {
     temporary
   );
   run(executable, ["validate", passportOutput], temporary);
+  const verification = JSON.parse(
+    run(
+      executable,
+      [
+        "verify-passport",
+        passportOutput,
+        "--bundle",
+        join(cliOutput, "run.bundle.json"),
+        "--report",
+        join(cliOutput, "conformance-report.json"),
+        "--oasf-record",
+        oasfRecord,
+        "--execution-evidence-resource",
+        stageFabricEvidence
+      ],
+      temporary
+    )
+  );
+  if (
+    verification.valid !== true ||
+    verification.verifiedSubjects !== 3 ||
+    verification.verifiedExecutionEvidenceResources !== 1
+  ) {
+    throw new Error("Installed CLI did not verify the complete Passport artifact set.");
+  }
   console.log(
     JSON.stringify({
       cliVersion: version,
       cliDemo: "pass",
       cliStageFabricBinding: "pass",
-      cliPassport: "pass"
+      cliPassport: "pass",
+      cliPassportVerification: "pass"
     })
   );
 } finally {

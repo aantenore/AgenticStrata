@@ -64,6 +64,26 @@ A conforming builder fails closed unless:
 
 These checks establish deterministic internal consistency. They do not authenticate a producer or prevent wholesale replacement by an actor able to construct another self-consistent set.
 
+## Consumer verification
+
+A consumer must not treat schema validation as verification of the external
+subjects. `verifyExecutionPassport` and the `verify-passport` CLI require the
+Passport plus the complete RunBundle, ConformanceReport, opaque OASF record, and
+the exact bytes of every execution-evidence resource. The verifier:
+
+1. validates the strict v2 Statement;
+2. repeats every creation-time bundle, report, receipt, run, status, and time check;
+3. reconstructs and compares the three ordered subject descriptors and predicate;
+4. matches every external evidence descriptor to exactly one supplied file by
+   SHA-256 over its complete bytes; and
+5. rejects missing, duplicated, or unreferenced evidence files.
+
+This is unsigned artifact-set verification. Producer-contract semantics are
+validated by the adapter that creates a binding; OASF semantics remain with its
+owner. Authenticity, signer identity, trusted time, revocation, and protection
+against wholesale replacement still require an externally verified envelope or
+trusted store.
+
 ## OASF, DSSE, and signing boundaries
 
 OASF input is an opaque I-JSON object. Validate it with the owning ecosystem before Passport creation; its subject digest proves which canonical bytes were bound, not semantic OASF validity.

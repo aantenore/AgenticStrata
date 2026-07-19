@@ -16,7 +16,8 @@ import {
   runConformance,
   runDemo,
   serializeStageFabricExecutionPlacementEvidence,
-  validateDocument
+  validateDocument,
+  verifyExecutionPassport
 } from "../src/index.js";
 import type { StageFabricExecutionPlacementEvidence } from "../src/index.js";
 import { writeJson, writeText } from "../src/adapters/documents.js";
@@ -154,6 +155,31 @@ describe("StageFabric execution placement evidence adapter", () => {
     expect(() => createExecutionPassport(passportInput(unrelated))).toThrow(
       "belongs to a different run"
     );
+  });
+
+  it("verifies the complete golden StageFabric artifact from the consumer side", () => {
+    const fixturePath = fileURLToPath(
+      new URL("fixtures/stagefabric/execution-placement-evidence.json", import.meta.url)
+    );
+    const source = readFileSync(fixturePath);
+    const evidence = JSON.parse(source.toString("utf8")) as StageFabricExecutionPlacementEvidence;
+    const input = passportInput(evidence);
+    const passport = createExecutionPassport(input);
+
+    expect(
+      verifyExecutionPassport({
+        passport,
+        bundle: input.bundle,
+        report: input.report,
+        oasfRecord: input.oasfRecord,
+        executionEvidenceResources: [source]
+      })
+    ).toEqual({
+      valid: true,
+      issues: [],
+      verifiedSubjects: 3,
+      verifiedExecutionEvidenceResources: 1
+    });
   });
 
   it("emits canonical CLI input for the passport command without provider content", async () => {

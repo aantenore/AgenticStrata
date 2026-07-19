@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { validateAs } from "../contracts/registry.js";
 import {
   API_VERSION,
@@ -13,9 +15,10 @@ import {
   type ResourceDescriptor,
   type RunBundle,
   type RunBundleResourceDescriptor,
+  type ValidationIssue,
   type ValidationResult
 } from "../contracts/types.js";
-import { digestValue, verifySeal } from "./canonical.js";
+import { canonicalize, digestValue, verifySeal } from "./canonical.js";
 import { evidenceIndex, verifyTraceChain } from "./receipts.js";
 
 export interface ExecutionPassportSubjectUris {
@@ -32,6 +35,19 @@ export interface CreateExecutionPassportInput {
   subjectUris?: ExecutionPassportSubjectUris;
   executionEvidence?: readonly ExecutionEvidenceBinding[];
   issuedAt?: string;
+}
+
+export interface VerifyExecutionPassportInput {
+  passport: ExecutionPassport;
+  bundle: RunBundle;
+  report: ConformanceReport;
+  oasfRecord: unknown;
+  executionEvidenceResources?: readonly Uint8Array[];
+}
+
+export interface ExecutionPassportVerificationResult extends ValidationResult {
+  verifiedSubjects: number;
+  verifiedExecutionEvidenceResources: number;
 }
 
 function validationMessage(result: ValidationResult): string {
@@ -307,4 +323,144 @@ export function createExecutionPassport(
 
   requireValid("Execution Passport", validateAs("ExecutionPassport", passport));
   return passport;
+}
+
+function bytesDigest(value: Uint8Array): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function verificationFailure(
+  issues: ValidationIssue[],
+  verifiedSubjects = 0,
+  verifiedExecutionEvidenceResources = 0
+): ExecutionPassportVerificationResult {
+  return {
+    valid: false,
+    issues,
+    verifiedSubjects,
+    verifiedExecutionEvidenceResources
+  };
+}
+
+/**
+ * Verify one unsigned Passport against the complete artifacts supplied by its
+ * consumer. This establishes internal consistency and exact resource binding;
+ * signer identity and authenticity remain the responsibility of an external
+ * DSSE or equivalent trust-policy adapter.
+ */
+export function verifyExecutionPassport(
+  input: VerifyExecutionPassportInput
+): ExecutionPassportVerificationResult {
+  const schema = validateAs("ExecutionPassport", input.passport);
+  if (!schema.valid) {
+    return verificationFailure(schema.issues);
+  }
+
+  let expected: ExecutionPassport;
+  try {
+    expected = createExecutionPassport({
+      bundle: input.bundle,
+      report: input.report,
+      oasfRecord: input.oasfRecord,
+      oasfMediaType: input.passport.subject[2].mediaType,
+      subjectUris: {
+        ...(input.passport.subject[0].uri === undefined
+          ? {}
+          : { runBundle: input.passport.subject[0].uri }),
+        ...(input.passport.subject[1].uri === undefined
+          ? {}
+          : { conformanceReport: input.passport.subject[1].uri }),
+        ...(input.passport.subject[2].uri === undefined
+          ? {}
+          : { oasfRecord: input.passport.subject[2].uri })
+      },
+      executionEvidence: input.passport.predicate.executionEvidence,
+      issuedAt: input.passport.predicate.issuedAt
+    });
+  } catch (error: unknown) {
+    return verificationFailure([
+      {
+        path: "/",
+        code: "artifact-set",
+        message:
+          error instanceof Error
+            ? `The supplied Passport artifacts are inconsistent: ${error.message}`
+            : "The supplied Passport artifacts are inconsistent."
+      }
+    ]);
+  }
+
+  const issues: ValidationIssue[] = [];
+  let verifiedSubjects = 0;
+  for (const [index, subject] of input.passport.subject.entries()) {
+    if (canonicalize(subject) === canonicalize(expected.subject[index])) {
+      verifiedSubjects += 1;
+    } else {
+      issues.push({
+        path: `/subject/${index}`,
+        code: "subject-binding",
+        message: "The subject descriptor does not match the supplied artifact."
+      });
+    }
+  }
+
+  if (canonicalize(input.passport.predicate) !== canonicalize(expected.predicate)) {
+    issues.push({
+      path: "/predicate",
+      code: "predicate-binding",
+      message: "The Passport predicate does not match the supplied run and report."
+    });
+  }
+
+  const expectedResourceDigests = new Map(
+    input.passport.predicate.executionEvidence.map((binding, index) => [
+      binding.resource.digest.sha256,
+      index
+    ])
+  );
+  const suppliedResourceDigests = (input.executionEvidenceResources ?? []).map(bytesDigest);
+  const suppliedCounts = new Map<string, number>();
+  for (const digest of suppliedResourceDigests) {
+    suppliedCounts.set(digest, (suppliedCounts.get(digest) ?? 0) + 1);
+  }
+
+  let verifiedExecutionEvidenceResources = 0;
+  for (const [digest, index] of expectedResourceDigests) {
+    const count = suppliedCounts.get(digest) ?? 0;
+    if (count === 1) {
+      verifiedExecutionEvidenceResources += 1;
+    } else {
+      issues.push({
+        path: `/predicate/executionEvidence/${index}/resource/digest/sha256`,
+        code: count === 0 ? "resource-missing" : "resource-duplicate",
+        message:
+          count === 0
+            ? "No supplied execution-evidence artifact matches this digest."
+            : "More than one supplied execution-evidence artifact matches this digest."
+      });
+    }
+  }
+  for (const [index, digest] of suppliedResourceDigests.entries()) {
+    if (!expectedResourceDigests.has(digest)) {
+      issues.push({
+        path: `/executionEvidenceResources/${index}`,
+        code: "resource-unreferenced",
+        message: "The supplied execution-evidence artifact is not referenced by the Passport."
+      });
+    }
+  }
+
+  if (issues.length > 0) {
+    return verificationFailure(
+      issues,
+      verifiedSubjects,
+      verifiedExecutionEvidenceResources
+    );
+  }
+  return {
+    valid: true,
+    issues: [],
+    verifiedSubjects,
+    verifiedExecutionEvidenceResources
+  };
 }

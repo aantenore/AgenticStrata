@@ -8,18 +8,23 @@ import { canonicalize } from "../core/canonical.js";
 
 export const MAX_DOCUMENT_BYTES = 16 * 1024 * 1024;
 
-function readSource(path: string): string {
+export function readResourceBytes(path: string): Uint8Array {
   const metadata = statSync(path);
   if (!metadata.isFile()) {
-    throw new Error("Contract input must be a regular file.");
+    throw new Error("Input must be a regular file.");
   }
   if (metadata.size > MAX_DOCUMENT_BYTES) {
-    throw new Error(`Contract input exceeds the ${MAX_DOCUMENT_BYTES}-byte limit.`);
+    throw new Error(`Input exceeds the ${MAX_DOCUMENT_BYTES}-byte limit.`);
   }
   const bytes = readFileSync(path);
   if (bytes.byteLength > MAX_DOCUMENT_BYTES) {
-    throw new Error(`Contract input exceeds the ${MAX_DOCUMENT_BYTES}-byte limit.`);
+    throw new Error(`Input exceeds the ${MAX_DOCUMENT_BYTES}-byte limit.`);
   }
+  return bytes;
+}
+
+function readSource(path: string): string {
+  const bytes = readResourceBytes(path);
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
