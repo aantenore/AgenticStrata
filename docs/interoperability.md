@@ -12,7 +12,7 @@ AgenticStrata owns application-level runtime invariants. It deliberately leaves 
 | Policy engine | Grant, approval, attenuation query | The external enforcement point remains authoritative. |
 | OASF | Opaque agent-record subject descriptor | AgenticStrata binds canonical bytes but delegates semantic validation and media-type ownership. |
 | in-toto / DSSE | Execution Passport Statement and optional external envelope | The core owns deterministic binding; signing, identity, transparency, and trusted time stay outside it. |
-| StageFabric | Sealed content-free placement artifact reduced to an evidence descriptor | Adapter verifies schema, seal, exact writer bytes, run binding, and observation time; the result is observation-only and cannot expand authority. |
+| StageFabric | Sealed content-free placement artifact reduced to an evidence descriptor | Adapter verifies the finalized successful-run trace (`completed` or retry `429`/`502`/`503`/`504`), seal, exact writer bytes, run binding, and observation time; the result is observation-only and cannot expand authority. |
 | Other execution-placement provider | Content-free, run-bound evidence descriptor | No payload or `content` field is admitted; producer validation remains an explicit adapter responsibility. |
 
 Adapter YAML files are declarative mappings with an explicit `lossPolicy`. They contain no vendor SDK and can be replaced without changing the core contract registry.

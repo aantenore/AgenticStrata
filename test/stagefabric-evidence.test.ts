@@ -83,6 +83,21 @@ function passportInput(evidence: StageFabricExecutionPlacementEvidence) {
   } as const;
 }
 
+function resealTrace(
+  trace: readonly unknown[],
+  placementAttempt: number
+): unknown {
+  const valid = stageFabricEvidence();
+  const placement = valid.placements[0];
+  if (placement === undefined) throw new Error("fixture placement missing");
+  const unsigned = {
+    ...omitDigest(valid),
+    placements: [{ ...placement, attempt: placementAttempt }],
+    trace
+  };
+  return { ...unsigned, digest: sha256(unsigned) };
+}
+
 describe("StageFabric execution placement evidence adapter", () => {
   it("matches a retrying golden artifact emitted by StageFabric", () => {
     const fixturePath = fileURLToPath(
@@ -221,6 +236,70 @@ describe("StageFabric execution placement evidence adapter", () => {
         ...incoherent,
         digest: sha256(incoherent)
       })
+    ).toThrowError(new StageFabricEvidenceError("stagefabric_evidence_invalid"));
+  });
+
+  it("rejects failure semantics outside the successful StageFabric contract", () => {
+    const completed = stageFabricEvidence().trace[0];
+    if (completed === undefined) throw new Error("fixture trace event missing");
+    const completedAtAttemptTwo = { ...completed, attempt: 2 };
+
+    expect(() =>
+      createStageFabricExecutionEvidenceBinding(
+        resealTrace(
+          [
+            {
+              ...completed,
+              attempt: 1,
+              status: "failed",
+              reasonCode: "adapter_failed"
+            },
+            completedAtAttemptTwo
+          ],
+          2
+        )
+      )
+    ).toThrowError(new StageFabricEvidenceError("stagefabric_evidence_invalid"));
+
+    expect(() =>
+      createStageFabricExecutionEvidenceBinding(
+        resealTrace(
+          [
+            {
+              ...completed,
+              attempt: 1,
+              status: "failed",
+              reasonCode: "retryable_pre_output_status",
+              statusCode: 418
+            },
+            completedAtAttemptTwo
+          ],
+          2
+        )
+      )
+    ).toThrowError(new StageFabricEvidenceError("stagefabric_evidence_invalid"));
+
+    expect(() =>
+      createStageFabricExecutionEvidenceBinding(
+        resealTrace(
+          [
+            {
+              ...completed,
+              attempt: 1,
+              status: "failed",
+              reasonCode: "retryable_pre_output_status"
+            },
+            completedAtAttemptTwo
+          ],
+          2
+        )
+      )
+    ).toThrowError(new StageFabricEvidenceError("stagefabric_evidence_invalid"));
+
+    expect(() =>
+      createStageFabricExecutionEvidenceBinding(
+        resealTrace([{ ...completed, statusCode: 503 }], 1)
+      )
     ).toThrowError(new StageFabricEvidenceError("stagefabric_evidence_invalid"));
   });
 
