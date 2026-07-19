@@ -13,33 +13,43 @@ export const STAGEFABRIC_EXECUTION_EVIDENCE_MEDIA_TYPE =
 
 type StageFabricDigest = `sha256:${string}`;
 
-export interface StageFabricExecutionPlacement {
+export const STAGEFABRIC_RETRYABLE_PRE_OUTPUT_STATUS_CODES = [
+  429, 502, 503, 504
+] as const;
+
+export type StageFabricRetryablePreOutputStatusCode =
+  (typeof STAGEFABRIC_RETRYABLE_PRE_OUTPUT_STATUS_CODES)[number];
+
+export interface StageFabricExecutionTraceIdentity {
   stageIdDigest: StageFabricDigest;
   targetIdDigest: StageFabricDigest;
   zoneDigest: StageFabricDigest;
   adapterKindDigest: StageFabricDigest;
+}
+
+export interface StageFabricExecutionPlacement
+  extends StageFabricExecutionTraceIdentity {
   attempt: number;
   status: "succeeded";
   reasonCode: "completed";
 }
 
-export interface StageFabricExecutionTraceEvent {
-  stageIdDigest: StageFabricDigest;
-  targetIdDigest: StageFabricDigest;
-  zoneDigest: StageFabricDigest;
-  adapterKindDigest: StageFabricDigest;
-  attempt: number;
-  status: "succeeded" | "failed";
-  reasonCode:
-    | "completed"
-    | "retryable_pre_output_status"
-    | "adapter_not_registered"
-    | "adapter_failed"
-    | "invalid_outputs"
-    | "input_policy_rejected"
-    | "output_policy_rejected";
-  statusCode?: number;
-}
+export type StageFabricExecutionTraceEvent =
+  StageFabricExecutionTraceIdentity &
+    (
+      | {
+          attempt: number;
+          status: "succeeded";
+          reasonCode: "completed";
+          statusCode?: never;
+        }
+      | {
+          attempt: number;
+          status: "failed";
+          reasonCode: "retryable_pre_output_status";
+          statusCode: StageFabricRetryablePreOutputStatusCode;
+        }
+    );
 
 export interface StageFabricExecutionPlacementEvidence {
   apiVersion: "stagefabric.dev/v1alpha1";
@@ -81,6 +91,19 @@ const identityDigestProperties = {
   zoneDigest: digestSchema,
   adapterKindDigest: digestSchema
 } as const;
+const traceEventProperties = {
+  ...identityDigestProperties,
+  attempt: { type: "integer", minimum: 1, maximum: 33 }
+} as const;
+const traceEventRequired = [
+  "stageIdDigest",
+  "targetIdDigest",
+  "zoneDigest",
+  "adapterKindDigest",
+  "attempt",
+  "status",
+  "reasonCode"
+] as const;
 
 const schema = {
   type: "object",
@@ -126,33 +149,30 @@ const schema = {
       minItems: 1,
       maxItems: 33792,
       items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          ...identityDigestProperties,
-          attempt: { type: "integer", minimum: 1, maximum: 33 },
-          status: { enum: ["succeeded", "failed"] },
-          reasonCode: {
-            enum: [
-              "completed",
-              "retryable_pre_output_status",
-              "adapter_not_registered",
-              "adapter_failed",
-              "invalid_outputs",
-              "input_policy_rejected",
-              "output_policy_rejected"
-            ]
+        oneOf: [
+          {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              ...traceEventProperties,
+              status: { const: "succeeded" },
+              reasonCode: { const: "completed" }
+            },
+            required: traceEventRequired
           },
-          statusCode: { type: "integer", minimum: 100, maximum: 599 }
-        },
-        required: [
-          "stageIdDigest",
-          "targetIdDigest",
-          "zoneDigest",
-          "adapterKindDigest",
-          "attempt",
-          "status",
-          "reasonCode"
+          {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              ...traceEventProperties,
+              status: { const: "failed" },
+              reasonCode: { const: "retryable_pre_output_status" },
+              statusCode: {
+                enum: STAGEFABRIC_RETRYABLE_PRE_OUTPUT_STATUS_CODES
+              }
+            },
+            required: [...traceEventRequired, "statusCode"]
+          }
         ]
       }
     },

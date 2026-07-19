@@ -7,7 +7,7 @@ direction: inbound
 contractBindings:
   - strataContract: ExecutionEvidenceBinding
     protocolObject: ExecutionPlacementEvidence
-    notes: The executable adapter validates strict source schema, semantic trace, timestamp grammar, seal, and exact canonical-JSON-plus-LF writer bytes; converts the prefixed run digest; normalizes observedAt; fixes authority to observation-only; and hashes the retrievable file bytes.
+    notes: The executable adapter validates strict successful-run source schema, admits only completed events or pre-output retries with status 429/502/503/504, verifies semantic trace, timestamp grammar, seal, and exact canonical-JSON-plus-LF writer bytes; converts the prefixed run digest; normalizes observedAt; fixes authority to observation-only; and hashes the retrievable file bytes.
   - strataContract: ExecutionPassport
     protocolObject: predicate executionEvidence entry
     notes: Passport creation rejects a source from another run. No payload or content field is admitted, and placement never grants executable authority.

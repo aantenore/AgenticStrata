@@ -41,7 +41,7 @@ try {
     'const report = runConformance(result.bundle, "enterprise");',
     'const sha256 = (value) => `sha256:${digestValue(value)}`;',
     'const identity = { stageIdDigest: sha256("stage"), targetIdDigest: sha256("target"), zoneDigest: sha256("zone"), adapterKindDigest: sha256("adapter") };',
-    'const unsigned = { apiVersion: "stagefabric.dev/v1alpha1", kind: "ExecutionPlacementEvidence", producer: "stagefabric", disclosure: "content-free", authority: "observation-only", runIdDigest: sha256(result.bundle.execution.runId), observedAt: "2026-07-17T12:00:00.000Z", planDigest: sha256("plan"), bindingDigest: sha256("binding"), snapshotDigest: sha256("snapshot"), egressDigest: sha256("egress"), placements: [{ ...identity, attempt: 1, status: "succeeded", reasonCode: "completed" }], trace: [{ ...identity, attempt: 1, status: "succeeded", reasonCode: "completed" }] };',
+    'const unsigned = { apiVersion: "stagefabric.dev/v1alpha1", kind: "ExecutionPlacementEvidence", producer: "stagefabric", disclosure: "content-free", authority: "observation-only", runIdDigest: sha256(result.bundle.execution.runId), observedAt: "2026-07-17T12:00:00.000Z", planDigest: sha256("plan"), bindingDigest: sha256("binding"), snapshotDigest: sha256("snapshot"), egressDigest: sha256("egress"), placements: [{ ...identity, attempt: 2, status: "succeeded", reasonCode: "completed" }], trace: [{ ...identity, attempt: 1, status: "failed", reasonCode: "retryable_pre_output_status", statusCode: 503 }, { ...identity, attempt: 2, status: "succeeded", reasonCode: "completed" }] };',
     'const executionEvidence = createStageFabricExecutionEvidenceBinding({ ...unsigned, digest: sha256(unsigned) });',
     'const passport = createExecutionPassport({ bundle: result.bundle, report, oasfRecord: { opaqueExternalRecord: true }, oasfMediaType: "application/json", executionEvidence: [executionEvidence] });',
     'if (report.status !== "pass" || report.runStatus !== "completed" || result.readBack !== true || !validateDocument(passport).valid || passport.subject.length !== 3 || passport.predicate.executionEvidence.length !== 1) process.exit(2);',
@@ -93,12 +93,19 @@ try {
     snapshotDigest: sha256("snapshot"),
     egressDigest: sha256("egress"),
     placements: [
-      { ...identity, attempt: 1, status: "succeeded", reasonCode: "completed" }
+      { ...identity, attempt: 2, status: "succeeded", reasonCode: "completed" }
     ],
     trace: [
       {
         ...identity,
         attempt: 1,
+        status: "failed",
+        reasonCode: "retryable_pre_output_status",
+        statusCode: 503
+      },
+      {
+        ...identity,
+        attempt: 2,
         status: "succeeded",
         reasonCode: "completed"
       }

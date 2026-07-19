@@ -12,7 +12,7 @@ Execution Passport v2 requires every `ExecutionEvidenceBinding` to carry `runIdD
 
 Provider integrations are explicit reduction adapters. They validate the external artifact schema and producer seal, bind the complete artifact by digest, and emit only a strict descriptor.
 
-The StageFabric adapter binds the exact canonical JSON file bytes written by StageFabric, including its trailing LF, rather than hashing a reparsed object. Its CLI path rejects alternative encodings so a URI can be verified byte-for-byte against the descriptor.
+The StageFabric adapter binds the exact canonical JSON file bytes written by StageFabric, including its trailing LF, rather than hashing a reparsed object. Its CLI path rejects alternative encodings so a URI can be verified byte-for-byte against the descriptor. The finalized `0.7.0-alpha.1` successful-run contract admits only completed events and pre-output retries with status `429`, `502`, `503`, or `504`; terminal failures require a distinct producer artifact and cannot be relabeled into this binding.
 
 The evidence can explain where execution was observed. It cannot issue a grant, widen a grant, authorize a capability, or override an authority check. Provider payloads and result objects remain outside the Passport.
 

@@ -45,7 +45,7 @@ Every `ExecutionEvidenceBinding` contains exactly:
 
 The builder rejects a binding when `runIdDigest` does not match the bound run, when two evidence artifacts share a digest, when `observedAt` is later than the report, or when the descriptor is not strict. An observation can support lineage but cannot grant, widen, or substitute executable authority.
 
-For StageFabric, the resource digest is SHA-256 over the exact UTF-8 bytes written by its safe writer: canonical JSON for the complete evidence object, including the producer seal, followed by one LF byte. The CLI rejects YAML, pretty JSON, missing or extra whitespace, and other reserializations. If a descriptor carries a URI, retrieval must return those exact bytes.
+For StageFabric, the resource digest is SHA-256 over the exact UTF-8 bytes written by its safe writer: canonical JSON for the complete evidence object, including the producer seal, followed by one LF byte. The adapter accepts only its successful-run trace variants: `completed`, or `retryable_pre_output_status` with `429`, `502`, `503`, or `504`. The CLI rejects YAML, pretty JSON, missing or extra whitespace, and other reserializations. If a descriptor carries a URI, retrieval must return those exact bytes.
 
 Provider adapters must validate their source contract and seal before creating a binding. They must not copy stage names, targets, prompts, model input or output, credentials, paths, or provider result objects into the binding. Descriptor metadata can still be sensitive and must be redacted or pseudonymized; the URI is optional.
 
