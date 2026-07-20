@@ -5,6 +5,7 @@ export * from "./conformance/config.js";
 export * from "./conformance/engine.js";
 export * from "./conformance/manifest.js";
 export * from "./core/authority.js";
+export * from "./core/authenticated-passport.js";
 export * from "./core/canonical.js";
 export * from "./core/explain.js";
 export * from "./core/fingerprint.js";
