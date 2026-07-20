@@ -80,15 +80,16 @@ the exact bytes of every execution-evidence resource. The verifier:
 
 This is unsigned artifact-set verification. Producer-contract semantics are
 validated by the adapter that creates a binding; OASF semantics remain with its
-owner. Authenticity, signer identity, trusted time, revocation, and protection
-against wholesale replacement still require an externally verified envelope or
-trusted store.
+owner. `verifyAuthenticatedExecutionPassport` can compose this complete check
+with an injected external envelope verifier without changing the Statement
+schema. Authenticated-required mode never falls back to unsigned acceptance.
+Trusted time, revocation, and trust-root lifecycle remain consumer policy.
 
 ## OASF, DSSE, and signing boundaries
 
 OASF input is an opaque I-JSON object. Validate it with the owning ecosystem before Passport creation; its subject digest proves which canonical bytes were bound, not semantic OASF validity.
 
-For authenticity, wrap the exact RFC 8785 Statement bytes in a DSSE envelope with payload type `application/vnd.in-toto+json`, then enforce signer identity, trust material, freshness, revocation, and transparency policy outside AgenticStrata. Consumers explicitly choose either unsigned integrity or authenticated-required policy; there is no automatic downgrade.
+For authenticity, wrap the exact RFC 8785 Statement bytes in a DSSE envelope with payload type `application/vnd.in-toto+json`, then enforce signer identity, trust material, freshness, revocation, and transparency policy. The optional `agentic-strata/sigstore` verifier requires one DSSE signature, byte equality with the canonical Statement, positive CT/Rekor thresholds, and a literal issuer-plus-SAN allowlist. Its Sigstore dependencies are optional peers and are not imported by the root package. Consumers explicitly choose either unsigned integrity or authenticated-required policy; there is no automatic downgrade.
 
 ## Versioning and v1 migration
 

@@ -19,7 +19,7 @@ Adapter YAML files are declarative mappings with an explicit `lossPolicy`. They 
 
 ## Attestation exchange
 
-The Execution Passport uses the project-controlled predicate namespace documented at [`docs/spec/attestations/execution-passport/v2`](spec/attestations/execution-passport/v2/README.md). The core writes exact RFC 8785 Statement bytes. A deployment may pass those bytes to an external DSSE/Sigstore adapter using payload type `application/vnd.in-toto+json`; no signing key, certificate flow, or Sigstore dependency enters AgenticStrata.
+The Execution Passport uses the project-controlled predicate namespace documented at [`docs/spec/attestations/execution-passport/v2`](spec/attestations/execution-passport/v2/README.md). The core writes exact RFC 8785 Statement bytes and has no Sigstore import. A deployment may verify a DSSE envelope through the provider-neutral authenticated-verifier interface. `agentic-strata/sigstore` is a separately exported optional subpath whose Sigstore packages are optional peers; importing the root package does not load or install them. No signing key, OIDC flow, or certificate issuance enters AgenticStrata.
 
 Consumers choose one of two explicit policies:
 
@@ -27,6 +27,12 @@ Consumers choose one of two explicit policies:
 - **authenticated required**: reject a bare Statement and require successful external envelope, signer-identity, and trust-material verification.
 
 There is no implicit fallback from the second policy to the first. This prevents signature removal from becoming a silent trust downgrade.
+
+The Sigstore adapter supports either an injected `BundleVerifier` with
+enterprise or offline trust material, or the public client factory with TUF
+options. It deliberately accepts only exact issuer and subject-alternative-name
+pairs. Regular-expression identity policy, signing, key management, and
+multi-signature semantics are outside this adapter.
 
 ## Agent and flow specifications
 

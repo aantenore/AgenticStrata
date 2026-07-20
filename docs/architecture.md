@@ -86,7 +86,16 @@ expected Statement, checks the complete bundle/report relationship again, and
 requires a one-to-one digest match for external evidence. Schema validation by
 itself is deliberately insufficient.
 
-The core emits an unsigned Statement. A replaceable external adapter may wrap its exact RFC 8785 bytes in DSSE and use Sigstore or another trust system. Signature verification, signer identity, transparency-log policy, and trusted time remain consumer-owned controls.
+The core emits an unsigned Statement. `verifyAuthenticatedExecutionPassport`
+first verifies the complete artifact set, then delegates the envelope to an
+injected provider-neutral verifier over the exact RFC 8785 Statement bytes. It
+never falls back to unsigned acceptance. The optional `agentic-strata/sigstore`
+subpath admits only one-signature DSSE bundles with payload type
+`application/vnd.in-toto+json`, exact payload bytes, positive CT/Rekor
+thresholds, and an exact issuer-plus-SAN allowlist. Public Sigstore TUF loading
+is one factory; enterprise and offline trust stores inject their own compatible
+verifier. Signing, key custody, trust-root lifecycle, revocation, and stronger
+trusted-time policy remain outside the core.
 
 ## Safe semantic caching
 

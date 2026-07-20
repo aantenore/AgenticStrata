@@ -63,6 +63,28 @@ unreferenced files fail verification. The CLI exposes the same operation as
 `verify-passport`. This verifies an unsigned artifact set, not producer identity,
 OASF semantics, trusted time, or an external DSSE envelope.
 
+Authenticated verification is a separate composition, not a new Passport
+schema. `verifyAuthenticatedExecutionPassport` first runs the complete unsigned
+artifact-set verification. Only after that succeeds does it pass the exact UTF-8
+RFC 8785 Statement bytes and fixed in-toto payload type to an injected envelope
+verifier. The final result is authenticated only when the external verifier
+returns a complete signer and the digest of those same bytes. A failed or
+removed envelope cannot be reinterpreted as unsigned success.
+
+The optional `agentic-strata/sigstore` export supplies two constructors:
+
+- `createSigstoreEnvelopeVerifier` wraps a trust- and threshold-configured
+  Sigstore `BundleVerifier` for private, offline, or test environments;
+- `createPublicSigstoreEnvelopeVerifier` obtains the public Sigstore verifier
+  using explicit TUF options and thresholds.
+
+Both require at least one CT log and one Rekor entry, DSSE rather than a message
+signature, exactly one signature, payload type `application/vnd.in-toto+json`,
+byte equality with the canonical Passport, and one literal issuer-plus-SAN
+allowlist match. Identity inputs are not regular expressions. Root loading,
+cache freshness, revocation decisions, and any policy stronger than the
+underlying Sigstore client remain consumer responsibilities.
+
 ## Evidence, not file detection
 
 A conformance run consumes a `RunBundle`. It does not infer architecture from directory names, imports, or keywords. This avoids declaring success simply because a project contains a policy file or telemetry package. Conversely, a source scanner remains useful before runtime evidence exists; its result should be treated as a discovery signal rather than runtime proof.

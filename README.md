@@ -26,6 +26,7 @@
 | Prepare, commit, verify, and compensate lifecycle | Side effects become explicit, approval-aware, and checkable instead of hidden inside an agent loop. |
 | Configurable conformance profiles | The same application can apply stricter evidence rules to enterprise, regulated, local, or distributed runs. |
 | Plain-language explanation and Execution Passport | Technical run evidence can be shared with non-specialists and bound to external attestations without embedding the full payload. |
+| Optional authenticated Passport verification | A relying party can require an exact trusted signer and reject a removed, altered, or substituted DSSE envelope without coupling the core to one trust provider. |
 
 > **Maturity and limits:** this is an executable alpha reference architecture,
 > not a hosted agent platform or regulatory certification. Digital fingerprints
@@ -76,6 +77,7 @@ Logical strata may share one process. The rule is a dependency and responsibilit
 - An RFC 8785 JSON Canonicalization Scheme implementation with cross-language golden vectors, strict duplicate-member rejection at the JSON boundary, and a hash-linked receipt chain with tamper and missing-evidence detection.
 - Runtime conformance checks for rooted authority, causal evidence, actual budget consumption, exact-action idempotency, approval, read-back or compensation, predeclared criterion evidence bindings, layer direction, and model/authority separation.
 - An [Execution Passport v2](docs/spec/attestations/execution-passport/v2/README.md) that binds one run bundle, its complete conformance report, one externally validated OASF record, and optional run-bound observations in a strict in-toto Statement without embedding those documents.
+- Provider-neutral authenticated consumer composition plus an optional `agentic-strata/sigstore` adapter that verifies DSSE structure, exact canonical Passport bytes, cryptographic trust, and an exact issuer-plus-SAN allowlist.
 - Mapping-only adapter documents for AG-UI, A2A, MCP, OpenTelemetry GenAI, CloudEvents, an external policy engine, and OASF, plus an executable StageFabric evidence-reduction adapter.
 - A neutral prepare/commit/read-back demo with exact-action approval and duplicate suppression.
 
@@ -139,6 +141,54 @@ semantics. Repeat `--execution-evidence` and
 
 `bind-stagefabric` accepts only the exact canonical JSON plus trailing LF emitted by the StageFabric evidence writer. Pretty-printed JSON, YAML, or a reserialized object is rejected because the resulting descriptor digest identifies the retrievable file bytes, not merely an equivalent object.
 
+### Optional authenticated verification
+
+The root package has no runtime dependency on Sigstore. Install the optional
+peers only in a relying party that needs Sigstore verification:
+
+```bash
+npm install agentic-strata sigstore@5 @sigstore/bundle@5
+```
+
+```js
+import { verifyAuthenticatedExecutionPassport } from "agentic-strata";
+import {
+  createPublicSigstoreEnvelopeVerifier
+} from "agentic-strata/sigstore";
+
+const verifier = await createPublicSigstoreEnvelopeVerifier({
+  identityPolicy: {
+    allowedSigners: [{
+      issuer: "https://token.actions.githubusercontent.com",
+      subjectAlternativeName: "https://github.com/example/project/.github/workflows/release.yml@refs/heads/main"
+    }]
+  },
+  thresholds: { ctLog: 1, tlog: 1 }
+});
+
+const result = await verifyAuthenticatedExecutionPassport({
+  passport,
+  bundle,
+  report,
+  oasfRecord,
+  executionEvidenceResources,
+  envelope: sigstoreBundle,
+  verifier
+});
+```
+
+The identity values are literal exact matches, never regular expressions or
+wildcards. An enterprise or offline deployment can instead pass its own
+threshold-configured Sigstore `BundleVerifier` to
+`createSigstoreEnvelopeVerifier`. A bare Statement, non-DSSE bundle, second
+signature, different payload type, non-canonical payload bytes, failed trust
+verification, or different signer fails closed. The adapter verifies only; it
+does not obtain OIDC tokens or sign Passports.
+
+Sigstore 5 currently requires Node.js `^22.22.2 || ^24.15.0 || >=26.0.0`.
+This narrower requirement applies only when importing `agentic-strata/sigstore`;
+the root package remains usable on Node.js 22 or newer.
+
 All commands accept JSON; `validate` and `lint` also accept YAML. Build once with `npm run build` before invoking the repository-local CLI. Input documents are bounded to 16 MiB, JSON member names must be unique, and YAML alias expansion is limited.
 
 ## Profiles
@@ -179,6 +229,7 @@ Read [Architecture](docs/architecture.md), [Contracts and conformance](docs/cont
 - Run status and conformance status are separate: a failed run can still have an intact, conformant evidence record, but it is never explained as a completed outcome.
 - Reports bind the evaluator name, package version, semantic revision, selected rule set, and effective profile configuration. The evaluator digest identifies the declared implementation revision; it is not a code signature.
 - An unsigned Execution Passport proves deterministic integrity and cross-artifact binding only. Authenticity requires an externally verified DSSE envelope or equivalent trusted channel, and consumers must make that requirement explicit so removing a signature cannot silently downgrade policy.
+- `verifyAuthenticatedExecutionPassport` composes complete artifact-set verification with one injected envelope verifier. The optional Sigstore subpath enforces DSSE-only input, one signature, exact canonical payload bytes, positive CT/Rekor thresholds, and literal issuer-plus-SAN authorization; trust-root lifecycle and revocation policy remain deployment responsibilities.
 - Consumer verification requires the complete supplied subject set and exact bytes for every execution-evidence resource; validating the Passport schema alone does not verify those bindings.
 - The OASF subject digest proves which opaque record was bound; it does not prove that the record is semantically valid OASF. Validate it before passport creation with the specification owner’s tooling.
 - Execution-placement evidence enters the predicate only as a strict, run-bound, observation-only descriptor with a normalized observation time and no payload or `content` field. A StageFabric descriptor hashes the exact canonical JSON file bytes, including its trailing LF. Descriptor metadata must come from a trusted producer and be redacted or pseudonymized when sensitive; its optional stable URI may be omitted. Full provider result objects are outside the Passport contract.
@@ -193,6 +244,6 @@ Read [Architecture](docs/architecture.md), [Contracts and conformance](docs/cont
 npm run release:check
 ```
 
-The release gate runs strict lint and types, 80+ tests with coverage thresholds, build, repository hygiene, production audit, `publint`, and Are the Types Wrong.
+The release gate runs strict lint and types, 100+ tests with coverage thresholds, build, repository hygiene, production audit, `publint`, and Are the Types Wrong.
 
 Apache-2.0 licensed. See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -34,6 +34,12 @@ try {
     ["install", "--ignore-scripts", "--no-audit", "--no-fund", join(temporary, filename)],
     temporary
   );
+  if (
+    existsSync(join(temporary, "node_modules", "sigstore")) ||
+    existsSync(join(temporary, "node_modules", "@sigstore", "bundle"))
+  ) {
+    throw new Error("Optional Sigstore peers were installed with the core package.");
+  }
 
   const probe = [
     'import { createExecutionPassport, createStageFabricExecutionEvidenceBinding, digestValue, runConformance, runDemo, validateDocument } from "agentic-strata";',
@@ -187,6 +193,30 @@ try {
       cliPassport: "pass",
       cliPassportVerification: "pass"
     })
+  );
+
+  run(
+    "npm",
+    [
+      "install",
+      "--ignore-scripts",
+      "--no-audit",
+      "--no-fund",
+      "sigstore@5",
+      "@sigstore/bundle@5"
+    ],
+    temporary
+  );
+  const sigstoreProbe = [
+    'import { createSigstoreEnvelopeVerifier } from "agentic-strata/sigstore";',
+    'const bundleVerifier = { verify: () => { throw new Error("not invoked"); } };',
+    'let rejected = false;',
+    'try { createSigstoreEnvelopeVerifier({ bundleVerifier, identityPolicy: { allowedSigners: [{ issuer: "https://issuer.example", subjectAlternativeName: "https://identity.example/workload" }] }, thresholds: { ctLog: 0, tlog: 1 } }); } catch (error) { rejected = error instanceof Error && error.message === "Sigstore ctLog threshold must be a positive integer."; }',
+    'if (!rejected) process.exit(2);',
+    'console.log(JSON.stringify({ optionalSigstoreSubpath: "pass", failClosedThresholds: "pass" }));'
+  ].join("\n");
+  process.stdout.write(
+    run(process.execPath, ["--input-type=module", "--eval", sigstoreProbe], temporary)
   );
 } finally {
   rmSync(temporary, { recursive: true, force: true });
