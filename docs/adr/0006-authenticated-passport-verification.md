@@ -24,15 +24,17 @@ There is no automatic unsigned fallback.
 Sigstore support is isolated behind the optional `agentic-strata/sigstore`
 subpath. `sigstore` and `@sigstore/bundle` are optional peer dependencies and
 the root index never imports the adapter. The adapter supports either an
-injected, threshold-configured `BundleVerifier` for enterprise or offline trust
-material, or a factory using the public Sigstore client and TUF options.
+injected, caller-trusted `BundleVerifier` for enterprise or offline trust
+material, or a factory using the public Sigstore client and TUF options. Only
+the public factory owns and wires configured CT/Rekor thresholds; an injected
+verifier's trust enforcement is explicitly caller-owned.
 
 The Sigstore boundary requires:
 
 - DSSE rather than a message signature;
 - exactly one signature;
 - exact payload type and byte equality with the canonical Passport;
-- CT-log and Rekor thresholds of at least one;
+- CT-log and Rekor thresholds of at least one when using the public factory;
 - a cryptographically verified signer containing both issuer and SAN; and
 - literal equality with one configured issuer-plus-SAN pair.
 

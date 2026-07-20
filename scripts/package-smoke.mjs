@@ -208,10 +208,9 @@ try {
     temporary
   );
   const sigstoreProbe = [
-    'import { createSigstoreEnvelopeVerifier } from "agentic-strata/sigstore";',
-    'const bundleVerifier = { verify: () => { throw new Error("not invoked"); } };',
+    'import { createPublicSigstoreEnvelopeVerifier } from "agentic-strata/sigstore";',
     'let rejected = false;',
-    'try { createSigstoreEnvelopeVerifier({ bundleVerifier, identityPolicy: { allowedSigners: [{ issuer: "https://issuer.example", subjectAlternativeName: "https://identity.example/workload" }] }, thresholds: { ctLog: 0, tlog: 1 } }); } catch (error) { rejected = error instanceof Error && error.message === "Sigstore ctLog threshold must be a positive integer."; }',
+    'try { await createPublicSigstoreEnvelopeVerifier({ identityPolicy: { allowedSigners: [{ issuer: "https://issuer.example", subjectAlternativeName: "https://identity.example/workload" }] }, thresholds: { ctLog: 0, tlog: 1 } }); } catch (error) { rejected = error instanceof Error && error.message === "Sigstore ctLog threshold must be a positive integer."; }',
     'if (!rejected) process.exit(2);',
     'console.log(JSON.stringify({ optionalSigstoreSubpath: "pass", failClosedThresholds: "pass" }));'
   ].join("\n");

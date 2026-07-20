@@ -10,6 +10,7 @@ import {
   verifyAuthenticatedExecutionPassport
 } from "../src/index.js";
 import type {
+  EnvelopeVerificationResult,
   EnvelopeVerifier,
   VerifyAuthenticatedExecutionPassportInput
 } from "../src/index.js";
@@ -156,6 +157,41 @@ describe("authenticated Execution Passport verification", () => {
       verifier: incomplete
     });
     expect(incompleteResult.issues[0]?.code).toBe("envelope-verifier-result");
+
+    const contradictory: EnvelopeVerifier = {
+      provider: "test-envelope",
+      verify: ({ expectedPayload }) => Promise.resolve({
+        valid: true,
+        issues: [
+          {
+            path: "/authentication/signature",
+            code: "signature-invalid",
+            message: "A valid result cannot retain a failure issue."
+          }
+        ],
+        authenticatedPayloadDigest: digestBytes(expectedPayload),
+        signer: null
+      } as unknown as EnvelopeVerificationResult)
+    };
+    const contradictoryResult = await verifyAuthenticatedExecutionPassport({
+      ...input,
+      verifier: contradictory
+    });
+    expect(contradictoryResult).toMatchObject({
+      valid: false,
+      trustLevel: "unverified",
+      issues: [{ code: "envelope-verifier-result" }]
+    });
+
+    const malformed: EnvelopeVerifier = {
+      provider: "test-envelope",
+      verify: () => Promise.resolve(null as unknown as EnvelopeVerificationResult)
+    };
+    const malformedResult = await verifyAuthenticatedExecutionPassport({
+      ...input,
+      verifier: malformed
+    });
+    expect(malformedResult.issues[0]?.code).toBe("envelope-verifier-result");
 
     const mismatched: EnvelopeVerifier = {
       provider: "test-envelope",

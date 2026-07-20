@@ -77,6 +77,28 @@ function failedAuthentication(
   return { status: "failed", provider, issues };
 }
 
+function isEnvelopeVerificationResult(
+  value: unknown
+): value is EnvelopeVerificationResult {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  if (typeof candidate.valid !== "boolean" || !Array.isArray(candidate.issues)) {
+    return false;
+  }
+  const issuesAreStructured = candidate.issues.every(
+    (item) =>
+      item !== null &&
+      typeof item === "object" &&
+      !Array.isArray(item) &&
+      typeof (item as Record<string, unknown>).path === "string" &&
+      typeof (item as Record<string, unknown>).code === "string" &&
+      typeof (item as Record<string, unknown>).message === "string"
+  );
+  return issuesAreStructured && (candidate.valid || candidate.issues.length > 0);
+}
+
 /**
  * Verify a complete Execution Passport artifact set and require an external,
  * authenticated envelope over the exact canonical Statement bytes. The core
@@ -128,6 +150,24 @@ export async function verifyAuthenticatedExecutionPassport(
     };
   }
 
+  if (!isEnvelopeVerificationResult(verified)) {
+    const issues: ValidationIssue[] = [
+      {
+        path: "/authentication",
+        code: "envelope-verifier-result",
+        message:
+          "The authenticated envelope verifier did not return a well-formed verification result."
+      }
+    ];
+    return {
+      valid: false,
+      issues,
+      trustLevel: "unverified",
+      artifactSet,
+      authentication: failedAuthentication(input.verifier.provider, issues)
+    };
+  }
+
   if (!verified.valid) {
     return {
       valid: false,
@@ -138,9 +178,17 @@ export async function verifyAuthenticatedExecutionPassport(
     };
   }
 
+  const signer = verified.signer;
   if (
-    verified.signer === undefined ||
-    verified.authenticatedPayloadDigest === undefined
+    verified.issues.length !== 0 ||
+    signer === undefined ||
+    signer === null ||
+    typeof signer !== "object" ||
+    typeof signer.issuer !== "string" ||
+    signer.issuer.length === 0 ||
+    typeof signer.subjectAlternativeName !== "string" ||
+    signer.subjectAlternativeName.length === 0 ||
+    typeof verified.authenticatedPayloadDigest !== "string"
   ) {
     const issues: ValidationIssue[] = [
       {
@@ -186,7 +234,10 @@ export async function verifyAuthenticatedExecutionPassport(
       status: "verified",
       provider: input.verifier.provider,
       authenticatedPayloadDigest: expectedPayloadDigest,
-      signer: verified.signer,
+      signer: {
+        issuer: signer.issuer,
+        subjectAlternativeName: signer.subjectAlternativeName
+      },
       issues: []
     }
   };

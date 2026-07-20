@@ -37,12 +37,6 @@ export const DEFAULT_SIGSTORE_VERIFICATION_THRESHOLDS = {
 export interface CreateSigstoreEnvelopeVerifierInput {
   bundleVerifier: BundleVerifier;
   identityPolicy: SigstoreIdentityPolicy;
-  /**
-   * Thresholds already enforced by the injected BundleVerifier. Values below
-   * one are rejected so authenticated-required mode cannot disable Sigstore's
-   * certificate or transparency verification by configuration.
-   */
-  thresholds?: SigstoreVerificationThresholds;
 }
 
 export type PublicSigstoreTufOptions = Pick<
@@ -60,9 +54,7 @@ export interface CreatePublicSigstoreEnvelopeVerifierInput {
   tuf?: PublicSigstoreTufOptions;
 }
 
-export interface SigstoreEnvelopeVerifier extends EnvelopeVerifier {
-  readonly thresholds: Readonly<SigstoreVerificationThresholds>;
-}
+export type SigstoreEnvelopeVerifier = EnvelopeVerifier;
 
 const MAX_ALLOWED_SIGNERS = 32;
 const MAX_IDENTITY_LENGTH = 2048;
@@ -254,17 +246,16 @@ function verifySigstoreEnvelope(
 }
 
 /**
- * Wrap an enterprise, offline, or test BundleVerifier. The caller configures
- * its trust material and must ensure it enforces the declared thresholds.
+ * Wrap an enterprise, offline, or test BundleVerifier. The injected verifier
+ * is trusted code: its trust material, log/timestamp thresholds, and revocation
+ * policy are caller-owned and are not inferred by this adapter.
  */
 export function createSigstoreEnvelopeVerifier(
   input: CreateSigstoreEnvelopeVerifierInput
 ): SigstoreEnvelopeVerifier {
   const identityPolicy = copyIdentityPolicy(input.identityPolicy);
-  const thresholds = copyThresholds(input.thresholds);
   return {
     provider: "sigstore",
-    thresholds,
     verify: (verificationInput) =>
       Promise.resolve(
         verifySigstoreEnvelope(
@@ -291,7 +282,6 @@ export async function createPublicSigstoreEnvelopeVerifier(
   });
   return createSigstoreEnvelopeVerifier({
     bundleVerifier,
-    identityPolicy: input.identityPolicy,
-    thresholds
+    identityPolicy: input.identityPolicy
   });
 }

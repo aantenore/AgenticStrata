@@ -178,9 +178,11 @@ const result = await verifyAuthenticatedExecutionPassport({
 ```
 
 The identity values are literal exact matches, never regular expressions or
-wildcards. An enterprise or offline deployment can instead pass its own
-threshold-configured Sigstore `BundleVerifier` to
-`createSigstoreEnvelopeVerifier`. A bare Statement, non-DSSE bundle, second
+wildcards. An enterprise or offline deployment can instead pass its own trusted
+Sigstore `BundleVerifier` to `createSigstoreEnvelopeVerifier`. That injected
+verifier owns its certificate, log, timestamp, revocation, and private-root
+policy; AgenticStrata does not claim to introspect its configuration. A bare
+Statement, non-DSSE bundle, second
 signature, different payload type, non-canonical payload bytes, failed trust
 verification, or different signer fails closed. The adapter verifies only; it
 does not obtain OIDC tokens or sign Passports.
@@ -229,7 +231,7 @@ Read [Architecture](docs/architecture.md), [Contracts and conformance](docs/cont
 - Run status and conformance status are separate: a failed run can still have an intact, conformant evidence record, but it is never explained as a completed outcome.
 - Reports bind the evaluator name, package version, semantic revision, selected rule set, and effective profile configuration. The evaluator digest identifies the declared implementation revision; it is not a code signature.
 - An unsigned Execution Passport proves deterministic integrity and cross-artifact binding only. Authenticity requires an externally verified DSSE envelope or equivalent trusted channel, and consumers must make that requirement explicit so removing a signature cannot silently downgrade policy.
-- `verifyAuthenticatedExecutionPassport` composes complete artifact-set verification with one injected envelope verifier. The optional Sigstore subpath enforces DSSE-only input, one signature, exact canonical payload bytes, positive CT/Rekor thresholds, and literal issuer-plus-SAN authorization; trust-root lifecycle and revocation policy remain deployment responsibilities.
+- `verifyAuthenticatedExecutionPassport` composes complete artifact-set verification with one injected envelope verifier. The optional Sigstore subpath enforces DSSE-only input, one signature, exact canonical payload bytes, and literal issuer-plus-SAN authorization. Its public-TUF factory also wires positive CT/Rekor thresholds; an injected enterprise verifier owns and must enforce its own trust thresholds, root lifecycle, and revocation policy.
 - Consumer verification requires the complete supplied subject set and exact bytes for every execution-evidence resource; validating the Passport schema alone does not verify those bindings.
 - The OASF subject digest proves which opaque record was bound; it does not prove that the record is semantically valid OASF. Validate it before passport creation with the specification owner’s tooling.
 - Execution-placement evidence enters the predicate only as a strict, run-bound, observation-only descriptor with a normalized observation time and no payload or `content` field. A StageFabric descriptor hashes the exact canonical JSON file bytes, including its trailing LF. Descriptor metadata must come from a trusted producer and be redacted or pseudonymized when sensitive; its optional stable URI may be omitted. Full provider result objects are outside the Passport contract.

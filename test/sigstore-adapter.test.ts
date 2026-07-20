@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import type { BundleVerifier } from "sigstore";
 
 import {
+  createPublicSigstoreEnvelopeVerifier,
   createSigstoreEnvelopeVerifier,
   type SigstoreIdentityPolicy
 } from "../src/adapters/sigstore.js";
@@ -142,8 +143,7 @@ describe("optional Sigstore adapter", () => {
     const envelope = dsseBundle(fixture.payload, keys.privateKey);
     const verifier = createSigstoreEnvelopeVerifier({
       bundleVerifier: ed25519BundleVerifier(keys.publicKey),
-      identityPolicy: exactPolicy(),
-      thresholds: { ctLog: 1, tlog: 1 }
+      identityPolicy: exactPolicy()
     });
 
     const result = await verifyAuthenticatedExecutionPassport({
@@ -252,16 +252,15 @@ describe("optional Sigstore adapter", () => {
     expect(missingResult.issues[0]?.code).toBe("sigstore-identity-missing");
   });
 
-  it("rejects disabled trust thresholds and a bare-Statement downgrade", async () => {
+  it("rejects disabled public-trust thresholds and a bare-Statement downgrade", async () => {
     const fixture = passportFixture();
     const keys = generateKeyPairSync("ed25519");
-    expect(() =>
-      createSigstoreEnvelopeVerifier({
-        bundleVerifier: ed25519BundleVerifier(keys.publicKey),
+    await expect(
+      createPublicSigstoreEnvelopeVerifier({
         identityPolicy: exactPolicy(),
         thresholds: { ctLog: 0, tlog: 1 }
       })
-    ).toThrow("Sigstore ctLog threshold must be a positive integer.");
+    ).rejects.toThrow("Sigstore ctLog threshold must be a positive integer.");
 
     const verifier = createSigstoreEnvelopeVerifier({
       bundleVerifier: ed25519BundleVerifier(keys.publicKey),

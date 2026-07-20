@@ -73,17 +73,20 @@ removed envelope cannot be reinterpreted as unsigned success.
 
 The optional `agentic-strata/sigstore` export supplies two constructors:
 
-- `createSigstoreEnvelopeVerifier` wraps a trust- and threshold-configured
-  Sigstore `BundleVerifier` for private, offline, or test environments;
+- `createSigstoreEnvelopeVerifier` wraps a caller-trusted Sigstore
+  `BundleVerifier` for private, offline, or test environments; the caller owns
+  its certificate, log, timestamp, revocation, and trust-root policy;
 - `createPublicSigstoreEnvelopeVerifier` obtains the public Sigstore verifier
   using explicit TUF options and thresholds.
 
-Both require at least one CT log and one Rekor entry, DSSE rather than a message
-signature, exactly one signature, payload type `application/vnd.in-toto+json`,
-byte equality with the canonical Passport, and one literal issuer-plus-SAN
-allowlist match. Identity inputs are not regular expressions. Root loading,
-cache freshness, revocation decisions, and any policy stronger than the
-underlying Sigstore client remain consumer responsibilities.
+Both require DSSE rather than a message signature, exactly one signature,
+payload type `application/vnd.in-toto+json`, byte equality with the canonical
+Passport, and one literal issuer-plus-SAN allowlist match. The public factory
+also rejects CT or Rekor thresholds below one and passes accepted values to
+Sigstore. The injected factory cannot introspect its trusted `BundleVerifier`
+and therefore makes no threshold claim on its behalf. Identity inputs are not
+regular expressions. Root loading, cache freshness, revocation decisions, and
+any policy stronger than the underlying verifier remain consumer responsibilities.
 
 ## Evidence, not file detection
 

@@ -89,7 +89,7 @@ Trusted time, revocation, and trust-root lifecycle remain consumer policy.
 
 OASF input is an opaque I-JSON object. Validate it with the owning ecosystem before Passport creation; its subject digest proves which canonical bytes were bound, not semantic OASF validity.
 
-For authenticity, wrap the exact RFC 8785 Statement bytes in a DSSE envelope with payload type `application/vnd.in-toto+json`, then enforce signer identity, trust material, freshness, revocation, and transparency policy. The optional `agentic-strata/sigstore` verifier requires one DSSE signature, byte equality with the canonical Statement, positive CT/Rekor thresholds, and a literal issuer-plus-SAN allowlist. Its Sigstore dependencies are optional peers and are not imported by the root package. Consumers explicitly choose either unsigned integrity or authenticated-required policy; there is no automatic downgrade.
+For authenticity, wrap the exact RFC 8785 Statement bytes in a DSSE envelope with payload type `application/vnd.in-toto+json`, then enforce signer identity, trust material, freshness, revocation, and transparency policy. The optional `agentic-strata/sigstore` verifier requires one DSSE signature, byte equality with the canonical Statement, and a literal issuer-plus-SAN allowlist. Its public-TUF factory also wires positive CT/Rekor thresholds; a caller-injected verifier owns its own threshold and trust policy. Sigstore dependencies are optional peers and are not imported by the root package. Consumers explicitly choose either unsigned integrity or authenticated-required policy; there is no automatic downgrade.
 
 ## Versioning and v1 migration
 
