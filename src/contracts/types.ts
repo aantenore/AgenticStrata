@@ -1,6 +1,6 @@
 export const API_VERSION = "agenticstrata.dev/v1" as const;
 export const EVALUATOR_NAME = "agentic-strata" as const;
-export const EVALUATOR_VERSION = "0.3.0-alpha.1" as const;
+export const EVALUATOR_VERSION = "0.4.0-alpha.1" as const;
 export const EVALUATOR_REVISION = "conformance-2026-07-19.1" as const;
 
 export const IN_TOTO_STATEMENT_V1_TYPE = "https://in-toto.io/Statement/v1" as const;
